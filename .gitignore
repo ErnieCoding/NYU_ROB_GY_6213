@@ -1,0 +1,9 @@
+venv/
+
+__pycache__/
+
+
+# Data Files
+*.jpg
+*.csv
+

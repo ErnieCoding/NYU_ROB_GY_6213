@@ -5,9 +5,9 @@
 #define SendDeltaTimeInMs 100      // Number ms between messages sent to laptop
 #define ReceiveDeltaTimeInMs 10    // Number ms between checking for control signals sent from laptop
 #define NoSignalDeltaTimeInMs 2000 // Number ms between message receives from laptop before stopping robot
-char ssid[] = "TP-Link_7BD6";      // REPLACE with your team's router ssid
-char pass[] = "15124654";          // REPLACE with your team's router password
-char remoteIP[] = "192.168.0.192"; // REPLACE with your laptop's IP address on your team's router
+char ssid[] = "RoboticsRule";      // REPLACE with your team's router ssid
+char pass[] = "1234567890";          // REPLACE with your team's router password
+char remoteIP[] = "192.168.0.199"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;     // local port to listen on - no need to change
 unsigned int remotePort = 4010;    // local port to listen on - no need to change
 int status = WL_IDLE_STATUS;
@@ -40,7 +40,7 @@ Servo myServo;
 // Encoder setup
 #define EncoderOutputA 4          // Encoder output pin A
 #define EncoderOutputB 5          // Encoder output pin B
-#define steering_angle_center 75  // REPLACE with team center angle for servor steering
+#define steering_angle_center 90  // REPLACE with team center angle for servor steering
 int a_state;
 int encoder_a_last_state; 
 int encoder_count;
@@ -260,8 +260,8 @@ void send_sensor_signal(SensorSignal sensor_signal)
     msg = msg + String(current_num_lidar_rays);
     msg = msg + current_lidar_scan_data;
     reset_lidar_message();
-    Serial.print("Sending msg: ");
-    Serial.println(msg);
+    //Serial.print("Sending msg: ");
+    //Serial.println(msg);
 
     Udp.beginPacket(remoteIP, remotePort);
     int   array_length  = msg.length()+1;

@@ -142,22 +142,22 @@ def sample_model(num_samples):
 
 # Some sample data to test with
 files_and_data = [
-    ['robot_data_60_0_28_01_26_13_41_44.pkl', 67/100], # filename, measured distance in meters
-    ['robot_data_60_0_28_01_26_13_43_41.pkl', 68/100],
-    ['robot_data_60_0_28_01_26_13_37_15.pkl', 113/100],
-    ['robot_data_60_0_28_01_26_13_35_18.pkl', 107/100],
-    ['robot_data_60_0_28_01_26_13_41_10.pkl', 65/100],
-    ['robot_data_60_0_28_01_26_13_42_55.pkl', 70/100],
-    ['robot_data_60_0_28_01_26_13_39_36.pkl', 138/100],
-    ['robot_data_60_0_28_01_26_13_42_19.pkl', 69/100],
-    ['robot_data_60_0_28_01_26_13_36_10.pkl', 109/100],
-    ['robot_data_60_0_28_01_26_13_33_20.pkl', 100/100],
-    ['robot_data_60_0_28_01_26_13_34_28.pkl', 103/100],
+    ['robot_data_78_0_05_02_26_18_47_21.pkl', 67/100], # filename, measured distance in meters
+    ['robot_data_100_0_05_02_26_18_38_56.pkl', 68/100],
+    # ['robot_data_60_0_28_01_26_13_37_15.pkl', 113/100],
+    # ['robot_data_60_0_28_01_26_13_35_18.pkl', 107/100],
+    # ['robot_data_60_0_28_01_26_13_41_10.pkl', 65/100],
+    # ['robot_data_60_0_28_01_26_13_42_55.pkl', 70/100],
+    # ['robot_data_60_0_28_01_26_13_39_36.pkl', 138/100],
+    # ['robot_data_60_0_28_01_26_13_42_19.pkl', 69/100],
+    # ['robot_data_60_0_28_01_26_13_36_10.pkl', 109/100],
+    # ['robot_data_60_0_28_01_26_13_33_20.pkl', 100/100],
+    # ['robot_data_60_0_28_01_26_13_34_28.pkl', 103/100],
     ]
 
 # Plot the motion model predictions for a single trial
 if False:
-    filename = './data_straight/robot_data_60_0_28_01_26_13_36_10.pkl'
+    filename = './data/robot_data_100_0_05_02_26_18_38_56.pkl'
     run_my_model_on_trial(filename)
 
 # Plot the motion model predictions for each trial in a folder
@@ -166,8 +166,8 @@ if False:
     plot_many_trial_predictions(directory)
 
 # A list of files to open, process, and plot - for comparing predicted with actual distances
-if False:
-    directory = ('./data_straight/')    
+if True:
+    directory = ('./data/')    
     process_files_and_plot(files_and_data, directory)
 
 # Try to sample with the motion model
