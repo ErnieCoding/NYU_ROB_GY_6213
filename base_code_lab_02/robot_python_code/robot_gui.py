@@ -48,16 +48,16 @@ def main():
     robot = robot_python_code.Robot()
 
     # Lidar data
-    max_lidar_range = 12
-    lidar_angle_res = 2
-    num_angles = int(360 / lidar_angle_res)
-    lidar_distance_list = []
-    lidar_cos_angle_list = []
-    lidar_sin_angle_list = []
-    for i in range(num_angles):
-        lidar_distance_list.append(max_lidar_range)
-        lidar_cos_angle_list.append(math.cos(i*lidar_angle_res/180*math.pi))
-        lidar_sin_angle_list.append(math.sin(i*lidar_angle_res/180*math.pi))
+    # max_lidar_range = 12
+    # lidar_angle_res = 2
+    # num_angles = int(360 / lidar_angle_res)
+    # lidar_distance_list = []
+    # lidar_cos_angle_list = []
+    # lidar_sin_angle_list = []
+    # for i in range(num_angles):
+    #     lidar_distance_list.append(max_lidar_range)
+    #     lidar_cos_angle_list.append(math.cos(i*lidar_angle_res/180*math.pi))
+    #     lidar_sin_angle_list.append(math.sin(i*lidar_angle_res/180*math.pi))
 
     # Set dark mode for gui
     dark = ui.dark_mode()
@@ -82,13 +82,13 @@ def main():
         return Response(content=jpeg, media_type='image/jpeg')
 
     # Convert lidar data to something visible in correct units. This is dummy data for lab 1.
-    def update_lidar_data():
-        for i in range(robot.robot_sensor_signal.num_lidar_rays):
-            distance_in_mm = robot.robot_sensor_signal.distances[i]
-            angle = 360-robot.robot_sensor_signal.angles[i]
-            if distance_in_mm > 20 and abs(angle) < 360:
-                index = max(0,min(int(360/lidar_angle_res-1),int((angle-(lidar_angle_res/2))/lidar_angle_res)))
-                lidar_distance_list[index] = distance_in_mm/1000
+    # def update_lidar_data():
+    #     for i in range(robot.robot_sensor_signal.num_lidar_rays):
+    #         distance_in_mm = robot.robot_sensor_signal.distances[i]
+    #         angle = 360-robot.robot_sensor_signal.angles[i]
+    #         if distance_in_mm > 20 and abs(angle) < 360:
+    #             index = max(0,min(int(360/lidar_angle_res-1),int((angle-(lidar_angle_res/2))/lidar_angle_res)))
+    #             lidar_distance_list[index] = distance_in_mm/1000
                
     # Determine what speed and steering commands to send
     def update_commands():
@@ -208,7 +208,7 @@ def main():
             with ui.card().classes('w-full items-center'):
                 ui.label('SPEED:').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
-                slider_speed = ui.slider(min=0, max=100, value=0)
+                slider_speed = ui.slider(min=0, max=100, value=85)
             with ui.card().classes('w-full items-center'):
                 ui.label().bind_text_from(slider_speed, 'value').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
@@ -220,7 +220,7 @@ def main():
             with ui.card().classes('w-full items-center'):
                 ui.label('STEER:').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
-                slider_steering = ui.slider(min=-20, max=20, value=0)
+                slider_steering = ui.slider(min=-20, max=20, value=-2)
             with ui.card().classes('w-full items-center'):
                 ui.label().bind_text_from(slider_steering, 'value').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
@@ -233,8 +233,8 @@ def main():
         cmd_speed, cmd_steering_angle = update_commands()
         robot.control_loop(cmd_speed, cmd_steering_angle, logging_switch.value)
         encoder_count_label.set_text(robot.robot_sensor_signal.encoder_counts)
-        update_lidar_data()
-        show_lidar_plot()
+        # update_lidar_data()
+        # show_lidar_plot()
         #update_video(video_image)
         
     ui.timer(0.1, control_loop)

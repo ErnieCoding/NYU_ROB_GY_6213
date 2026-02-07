@@ -22,5 +22,5 @@ filename_start = './data/robot_data'
 data_name_list = ['time', 'control_signal', 'robot_sensor_signal', 'camera_sensor_signal']
 
 # Experiment trial parameters
-trial_time = 7500 # milliseconds
+trial_time = 15000 # milliseconds
 extra_trial_log_time = 2000 # milliseconds

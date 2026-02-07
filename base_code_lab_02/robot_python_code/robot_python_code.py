@@ -283,7 +283,7 @@ class Robot:
         self.trial_start_time = 0
         self.msg_sender = None
         self.msg_receiver = None
-        self.camera_sensor = CameraSensor(parameters.camera_id)
+        self.camera_sensor = None # CameraSensor(parameters.camera_id)
         self.data_logger = DataLogger(parameters.filename_start, parameters.data_name_list)
         self.robot_sensor_signal = RobotSensorSignal([0, 0, 0])
         self.camera_sensor_signal = [0,0,0,0,0,0]

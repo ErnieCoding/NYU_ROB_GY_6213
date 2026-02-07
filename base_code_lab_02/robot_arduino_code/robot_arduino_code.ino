@@ -163,7 +163,7 @@ void forward(int speed)
   digitalWrite(LeftMotorDirPin1,HIGH);
   digitalWrite(LeftMotorDirPin2,LOW);
   analogWrite(LeftSpeedPin, speed);
-  analogWrite(RightSpeedPin, speed * 0.5);
+  analogWrite(RightSpeedPin, speed * 0.45);
 }
 
 // Receive control signal messages from laptop, but only have delta time has passed, e.g. 10ms
