@@ -208,7 +208,7 @@ def main():
             with ui.card().classes('w-full items-center'):
                 ui.label('SPEED:').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
-                slider_speed = ui.slider(min=0, max=100, value=85)
+                slider_speed = ui.slider(min=0, max=100, value=0)
             with ui.card().classes('w-full items-center'):
                 ui.label().bind_text_from(slider_speed, 'value').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
@@ -220,7 +220,7 @@ def main():
             with ui.card().classes('w-full items-center'):
                 ui.label('STEER:').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
-                slider_steering = ui.slider(min=-20, max=20, value=-2)
+                slider_steering = ui.slider(min=-20, max=20, value=0)
             with ui.card().classes('w-full items-center'):
                 ui.label().bind_text_from(slider_steering, 'value').style('text-align: center;')
             with ui.card().classes('w-full items-center'):

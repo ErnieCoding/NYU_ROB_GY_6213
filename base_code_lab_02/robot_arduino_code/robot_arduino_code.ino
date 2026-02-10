@@ -5,8 +5,10 @@
 #define SendDeltaTimeInMs 100      // Number ms between messages sent to laptop
 #define ReceiveDeltaTimeInMs 10    // Number ms between checking for control signals sent from laptop
 #define NoSignalDeltaTimeInMs 2000 // Number ms between message receives from laptop before stopping robot
-char ssid[] = "RoboticsRule";      // REPLACE with your team's router ssid
-char pass[] = "1234567890";          // REPLACE with your team's router password
+char ssid[] = "Tenda_9C90E0";      // REPLACE with your team's router ssid - PROFESSOR'S ROUTER
+char pass[] = "78972629";          // REPLACE with your team's router password - PROFESSOR'S ROUTER
+// char ssid[] = "Tenda_9C9620";
+// char pass[] = "90650529";
 char remoteIP[] = "192.168.0.199"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;     // local port to listen on - no need to change
 unsigned int remotePort = 4010;    // local port to listen on - no need to change
