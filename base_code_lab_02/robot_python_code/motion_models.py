@@ -4,32 +4,30 @@ import random
 
 # Motion Model constants
 
-
 # A function for obtaining variance in distance travelled as a function of distance travelled
 def variance_distance_travelled_s(distance):
     # Add student code here
-    var_s = 1
+    var_s = 0.00585994 * (distance/0.03063)
 
     return var_s
+
 
 # Function to calculate distance from encoder counts
 def distance_travelled_s(encoder_counts):
     # Add student code here
-    s = 0
-
+    s=0.02790 * encoder_counts + 17.61122
     return s
+
 
 # A function for obtaining variance in distance travelled as a function of distance travelled
 def variance_rotational_velocity_w(distance):
     # Add student code here
-    var_w = 1
-
-    return var_w
+    
+    return variace_w
 
 def rotational_velocity_w(steering_angle_command):
     # Add student code here
-    w = 0
-    
+    w = -0.0128 * steering_angle_command + 0.0016
     return w
 
 # This class is an example structure for implementing your motion model.

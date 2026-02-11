@@ -36,3 +36,6 @@ rotational_velocity_data = [ # data from rotational velocity trials: (time_s, sp
     (15, 85, -4, 76, 267, 271),
     (15, 85, -2, 157, 252, 286),
 ]
+
+
+final_trajectory = [(160, 150), ()] # (x_g, y_g)

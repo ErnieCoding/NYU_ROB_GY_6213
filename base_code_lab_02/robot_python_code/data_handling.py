@@ -19,6 +19,7 @@ def get_file_data(filename):
 
     # The dictionary should have keys ['time', 'control_signal', 'robot_sensor_signal', 'camera_sensor_signal']
     time_list = data_dict['time']
+    print(time_list)
     control_signal_list = data_dict['control_signal']
     robot_sensor_signal_list = data_dict['robot_sensor_signal']
     encoder_count_list = []
@@ -55,21 +56,28 @@ def plot_trial_basics():
     y_val = np.array(distances_traveled)
 
     # Predict distance vs encoder counts
-    m, b = np.polyfit(x_val, y_val, deg=1)
+    m = np.sum(x_val * y_val) / np.sum(x_val**2)
+    b = 0
     distance_predicted = m * x_val + b
     
     # Variance function f_ss(e)
     residuals = y_val - distance_predicted
     sigma_sq_actual = residuals ** 2
 
-    p_a, p_b, p_c = np.polyfit(x_val, sigma_sq_actual, deg=2)
-    sigma_sq_predicted = p_a * (x_val**2) + p_b * x_val + p_c
+
+    # polynomial
+    # p_a, p_b, p_c = np.polyfit(x_val, sigma_sq_actual, deg=2)
+    # sigma_sq_predicted = p_a * (x_val**2) + p_b * x_val + p_c
+
+    k = np.sum(x_val * sigma_sq_actual) / np.sum(x_val**2)
+    sigma_sq_predicted = k * x_val
     
     print("-" * 30)
     print("Distance Model f_se(e):")
-    print(f"s = {m:.5f} * e + {b:.5f}")
+    print(f"s = {m:.5f} * e")
+
     print("\nVariance Model f_ss(e):")
-    print(f"sigma^2 = {p_a:.8f} * e^2 + {p_b:.5f} * e + {p_c:.5f}")
+    print(f"sigma^2 = {k:.8f} * e")
     print("-" * 30)
 
 
@@ -204,6 +212,9 @@ def sample_model(num_samples):
 ######### MAIN ########
 if __name__ == "__main__":
     plot_trial_basics() # call plotting function for data
+
+    # print("Printing time list from pickle file:\n\n")
+    # get_file_data("data/robot_data_70_-5_07_02_26_00_02_47.pkl")
 
     # Some sample data to test with
     # files_and_data = [
