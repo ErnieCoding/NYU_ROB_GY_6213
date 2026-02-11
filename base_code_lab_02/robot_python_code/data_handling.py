@@ -13,7 +13,16 @@ import motion_models
 from measured_data import encoder_data, rotational_velocity_data
 
 # Open a file and return data in a form ready to plot
-def get_file_data(filename):
+def get_file_data(filename:str) -> list:
+    """
+    Opens a file and returns data in a form ready to plot
+
+    Arguments:
+        - filename: path to file to open
+    
+    Returns:
+        - list: the list with time, encoder count, velocity, and steering anglee lists
+    """
     data_loader = robot_python_code.DataLoader(filename)
     data_dict = data_loader.load()
 
@@ -34,15 +43,24 @@ def get_file_data(filename):
 
 
 # For a given trial, plot the encoder counts, velocities, steering angles
-# data from trials format: 
-# encoder_data (time_s, encoder_start, encoder_end, X_g, Y_g, distance)
-# rotational_velocity_data (time_s, speed, steering angle, X_g, Y_g, distance)
-def plot_trial_basics():
+def plot_trial_basics(encoder_data: list, rotiational_velocity_data: list) -> None:
+    """
+    Fits functions and plots data measured during trials for step 4 & 5 of Lab 2. 
+
+    Arguments:
+        - encoder_data: encoder vs distance data with tuples of (time_s, encoder_start, encoder_end, x_g, y_g, distance)
+        - rotational_velocity_data: rotational velocity vs steering angle/speed data with tuples of (time_s, speed, steering angle, X_g, Y_g, distance)
+    """
+
+    # STEP 4
     distances_traveled = []
     encoder_counts = []
+    endpoint_coordinates = []
 
     for trial in encoder_data:
         time_in_seconds, encoder_start, encoder_end, x_g, y_g = trial[0], trial[1], trial[2], trial[3], trial[4]
+
+        endpoint_coordinates.append((x_g, y_g))
 
         #TODO: make sure we do distance in meters from the beginning
         distance_trial = (math.sqrt(x_g**2 + y_g**2))/100
@@ -52,8 +70,11 @@ def plot_trial_basics():
         encoder_counts.append(encoder_count_trial)
     
     # Converted to numpy for math operations
-    x_val = np.array(encoder_counts)
-    y_val = np.array(distances_traveled)
+    x_val = np.array(encoder_counts) # X-value: encoder counts
+    y_val = np.array(distances_traveled) # Y-value: distance traveled calculated from x_g, y_g
+    endpoint_coordinates = np.array(endpoint_coordinates)
+    measured_x = endpoint_coordinates[:, 0] / 100
+    measured_y = endpoint_coordinates[:, 1] / 100  
 
     # Predict distance vs encoder counts
     m = np.sum(x_val * y_val) / np.sum(x_val**2)
@@ -65,7 +86,7 @@ def plot_trial_basics():
     sigma_sq_actual = residuals ** 2
 
 
-    # polynomial
+    # polynomial - apparently wrong
     # p_a, p_b, p_c = np.polyfit(x_val, sigma_sq_actual, deg=2)
     # sigma_sq_predicted = p_a * (x_val**2) + p_b * x_val + p_c
 
@@ -73,6 +94,7 @@ def plot_trial_basics():
     sigma_sq_predicted = k * x_val
     
     print("-" * 30)
+    print("STEP 4 FUNCTIONS\n")
     print("Distance Model f_se(e):")
     print(f"s = {m:.5f} * e")
 
@@ -82,16 +104,16 @@ def plot_trial_basics():
 
 
     # PLOTTING
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 10))
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 10))
     sort_idx = np.argsort(x_val)
 
-    # Distance
+    # STEP 4 PLOTS
+    # Encoder vs Distance
     ax1.scatter(x_val, y_val, label='Measured Data')
     ax1.plot(x_val[sort_idx], distance_predicted[sort_idx], color='red', label='Prediction f_se(e)')
     ax1.set_title('Distance Calibration: f_se(e)')
     ax1.set_xlabel('Encoder Counts')
-    ax1.set_ylabel('Distance (cm)')
+    ax1.set_ylabel('Distance (m)')
     ax1.legend()
     ax1.grid(True)
 
@@ -103,6 +125,123 @@ def plot_trial_basics():
     ax2.set_ylabel('Squared Error (sigma^2)')
     ax2.legend()
     ax2.grid(True)
+
+    # Endpoints x_g, y_g measured during trials
+    predicted_x = distance_predicted
+    predicted_y = np.zeros_like(predicted_x)
+    ax3.scatter(measured_x, measured_y, label="Measured Endpoints", color = "green")
+    ax3.set_title('Measured Endpoints X_g and Y_g')
+    ax3.set_xlabel("X_g (m)")
+    ax3.set_ylabel("Y_g (m)")
+    ax3.legend()
+    ax3.grid(True)
+
+    plt.tight_layout()
+
+
+    # STEP 5
+    # Calculating rotational velocity
+    rotationa_vel_data_updated = []
+    theta_start = math.radians(45)
+    for rotationa_vel_trial in rotational_velocity_data:
+        time_s, speed, steering_angle, X_g, Y_g, distance = rotationa_vel_trial
+        #calcualte the final angle
+        final_angle=math.atan(Y_g/X_g)
+        #calculate the angle in degrees
+        # print(f"Final angle in degrees: {math.degrees(final_angle)} degrees")
+        # print(f"Angle of rotation: {math.degrees(final_angle)-45} degrees")
+
+        time_s, speed, steering_angle, X_g, Y_g, distance = rotationa_vel_trial
+
+        # --- chord angle from origin to final position ---
+        phi_atan2 = math.atan2(Y_g, X_g)  # robust, handles quadrants and X_g=0 safely
+
+        # --- circular-arc correction: chord angle = theta_start + DeltaTheta/2 ---
+        delta_theta = 2.0 * (phi_atan2 - theta_start)
+
+        # --- yaw rate ---
+        w = delta_theta / time_s
+
+        rotationa_vel_data_updated.append((time_s, speed, steering_angle, w))
+        
+        # print(f"Time: {time_s}s, Speed: {speed}km/h, Steering Angle: {steering_angle}°, X_g: {X_g}, Y_g: {Y_g}, W: {w}") # printing trial data
+    
+    # fitting the steering angle and angular velocity data to a linear model
+    steering_angles = np.array([d[2] for d in rotationa_vel_data_updated])
+    angular_velocities = np.array([d[3] for d in rotationa_vel_data_updated])
+    coefficients_angle = np.polyfit(steering_angles, angular_velocities, 1)
+    linear_fit_rotation_velocity_steering = np.poly1d(coefficients_angle)
+
+    #fitting the speed and angular velocity data to a linear model
+    speed_values = np.array([d[1] for d in rotationa_vel_data_updated])
+    coefficients_speed = np.polyfit(speed_values, angular_velocities, 1)
+    # linear_fit_rotation_velocity_speed = np.poly1d(coefficients_speed)
+    
+
+    # Calculating variance
+    variance_data_steering_angle = []
+    variance_data_speed_angle = []
+
+
+    for data in rotationa_vel_data_updated:
+        steering_angles = data[2]
+        
+        predicted_anglular_velocity = linear_fit_rotation_velocity_steering(steering_angles)
+        
+        error_steering = predicted_anglular_velocity - data[3]
+        
+        error_steering_squared = error_steering**2
+        
+        # print(f"Steering Angle: {steering_angles} degrees, Predicted w: {predicted_anglular_velocity:.4f} radians/s, Actual w: {data[3]:.4f} radians/s, Error^2: {error_steering_squared:.4f} radians/s") # printing variance data
+        
+        variance_data_speed_angle.append((steering_angles, data[3], 
+        predicted_anglular_velocity,error_steering_squared))
+    
+    # Fitting function for the error vs steering angle - linear
+    steering_angles = [d[0] for d in variance_data_speed_angle]
+    errors_steering_angle = [d[3] for d in variance_data_speed_angle]
+
+    error_coefficients_steering = np.polyfit(steering_angles, errors_steering_angle, 1)
+    error_linear_fit_steering = np.poly1d(error_coefficients_steering)
+
+    # printing the functions:
+    print("STEP 5 FUNCTIONS\n")
+    linear_fit_rotation_velocity_steering_func = f"w = {coefficients_angle[0]:.4f} * steering_angle + {coefficients_angle[1]:.4f}"
+    print(f"Linear fit function: w = {coefficients_angle[0]:.4f} * steering_angle + {coefficients_angle[1]:.4f}")
+    
+    linear_fit_rotation_velocity_speed_func = f"w = {coefficients_speed[0]:.4f} * speed + {coefficients_speed[1]:.4f}"
+    print(f"Linear fit function: w = {coefficients_speed[0]:.4f} * speed + {coefficients_speed[1]:.4f}")
+    
+    print(f"Error Linear fit function: sigma_^2 = {error_coefficients_steering[0]:.4f} * steering_angle + {error_coefficients_steering[1]:.4f}")
+
+    # STEP 5 PLOTS
+    # Rotational Velocity vs Steering Angle
+    fig, (ax3, ax4, ax5) = plt.subplots(3, 1, figsize=(10, 10))
+    ax3.scatter(steering_angles, angular_velocities, c='blue', label='Steering Angle vs Rotational Velocity')
+    ax3.plot(steering_angles, linear_fit_rotation_velocity_steering(steering_angles), c='red', label='Prediction w')
+    ax3.set_title('Rotational Velocity vs Steering Angle:' + linear_fit_rotation_velocity_steering_func)   
+    ax3.set_xlabel('Steering Angle(Degrees)')
+    ax3.set_ylabel('Rotational Velocity (w) (radians/s)')
+    ax3.legend()
+    ax3.grid(True)
+
+    # Rotational Velocity vs Speed - not applicable
+    ax4.scatter(speed_values, angular_velocities, c='blue', label='Data Points')
+    # plt.plot(speed_values, linear_fit_rotation_velocity_speed(speed_values), c='red', label='Linear Fit')
+    ax4.set_title('Rotational Velocity vs Speed: Fit Function: ' + linear_fit_rotation_velocity_speed_func)   
+    ax4.set_xlabel('Speed (m/s)')
+    ax4.set_ylabel('Angular Velocity (w) (radians/s)')
+    ax4.legend()
+    ax4.grid(True)
+
+    # Squared Error vs Steering Angle + Error
+    ax5.scatter(steering_angles, errors_steering_angle, c='blue', label='Error Data Points')
+    ax5.plot(steering_angles, error_linear_fit_steering(steering_angles), c='red', label='Error Linear Fit')
+    ax5.set_title(f"Squared Error vs Steering Angle: sigma_^2 = {error_coefficients_steering[0]:.4f} * steering_angle + {error_coefficients_steering[1]:.4f}")
+    ax5.set_xlabel('Steering Angle (Degrees)')
+    ax5.set_ylabel('Squared Error (radians/s)^2')
+    ax5.legend()
+    ax5.grid(True)
 
     plt.tight_layout()
     plt.show()
@@ -211,8 +350,6 @@ def sample_model(num_samples):
 
 ######### MAIN ########
 if __name__ == "__main__":
-    # plot_trial_basics() # call plotting function for data
-
     # print("Printing time list from pickle file:\n\n")
     # get_file_data("data/robot_data_70_-5_07_02_26_00_02_47.pkl")
 
@@ -245,7 +382,9 @@ if __name__ == "__main__":
     ['robot_data_70_0_06_02_26_22_08_03.pkl', (math.sqrt(153**2+151**2))/100],
     ['robot_data_70_0_06_02_26_22_09_53.pkl', (math.sqrt(190**2+195**2))/100],
     ['robot_data_70_0_06_02_26_22_11_49.pkl', (math.sqrt(196**2+190**2))/100],
-    ]   
+    ]
+
+    plot_trial_basics(encoder_data, rotational_velocity_data)
     
 
     # Plot the motion model predictions for a single trial
@@ -259,7 +398,7 @@ if __name__ == "__main__":
         plot_many_trial_predictions(directory)
 
     # A list of files to open, process, and plot - for comparing predicted with actual distances
-    if True:
+    if False:
         directory = ('./data_stage4/')    
         process_files_and_plot(files_and_data, directory)
 
