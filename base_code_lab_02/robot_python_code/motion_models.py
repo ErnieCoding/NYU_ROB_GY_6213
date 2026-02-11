@@ -4,17 +4,18 @@ import random
 
 # Motion Model constants
 
+#TODO: update these functions to be in meters(right now they were in centimeters)
 # A function for obtaining variance in distance travelled as a function of distance travelled
 def variance_distance_travelled_s(distance):
     # Add student code here
-    var_s = 0.00585994 * (distance/0.03063)
+    var_s = 0.000000585994 * (distance/0.03063)
     return var_s
 
 
 # Function to calculate distance from encoder counts
 def distance_travelled_s(encoder_counts):
     # Add student code here
-    s=0.03063 * encoder_counts
+    s=0.0003063 * encoder_counts
     return s
 
 

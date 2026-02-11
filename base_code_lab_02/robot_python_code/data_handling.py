@@ -44,7 +44,8 @@ def plot_trial_basics():
     for trial in encoder_data:
         time_in_seconds, encoder_start, encoder_end, x_g, y_g = trial[0], trial[1], trial[2], trial[3], trial[4]
 
-        distance_trial = math.sqrt(x_g**2 + y_g**2)
+        #TODO: make sure we do distance in meters from the beginning
+        distance_trial = (math.sqrt(x_g**2 + y_g**2))/100
         encoder_count_trial = encoder_end - encoder_start
 
         distances_traveled.append(distance_trial)
@@ -116,9 +117,9 @@ def plot_trial_basics():
 
 
 # Plot a trajectory using the motion model, input data ste from a single trial.
-def run_my_model_on_trial(filename, show_plot = True, plot_color = 'ko'):
+def run_my_model_on_trial(filename, show_plot = True, plot_color = 'r'):
     time_list, encoder_count_list, velocity_list, steering_angle_list = get_file_data(filename)
-    
+
     motion_model = motion_models.MyMotionModel([0,0,0], 0)
     x_list, y_list, theta_list = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
 
@@ -132,7 +133,7 @@ def run_my_model_on_trial(filename, show_plot = True, plot_color = 'ko'):
 # Iterate through many trials and plot them as trajectories with motion model
 def plot_many_trial_predictions(directory):
     directory_path = Path(directory)
-    plot_color_list = ['r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.']
+    plot_color_list = ['r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.']
     count = 0
     for item in directory_path.iterdir():
         filename = item.name
@@ -180,7 +181,7 @@ def process_files_and_plot(files_and_data, directory):
         measured_distance_list.append(measured_distance)
         predicted_distance = run_my_model_to_predict_distance(directory + filename)
         predicted_distance_list.append(predicted_distance)
-
+        print(f"Processing file: {filename} with measured distance: {measured_distance:.2f} m predicted distance: {predicted_distance:.2f} m")
     # Plot predicted and measured distance travelled.
     plt.plot(measured_distance_list+[0], predicted_distance_list+[0], 'ko')
     plt.plot([0,1.7],[0,1.7])
@@ -217,8 +218,8 @@ if __name__ == "__main__":
 
     # Some sample data to test with
     # files_and_data = [
-    #     ['robot_data_78_0_05_02_26_18_47_21.pkl', 67/100], # filename, measured distance in meters
-    #     ['robot_data_100_0_05_02_26_18_38_56.pkl', 68/100],
+    #     ['robot_data_60_0_28_01_26_13_41_44.pkl', 67/100], # filename, measured distance in meters
+    #     ['robot_data_60_0_28_01_26_13_43_41.pkl', 68/100],
     #     ['robot_data_60_0_28_01_26_13_37_15.pkl', 113/100],
     #     ['robot_data_60_0_28_01_26_13_35_18.pkl', 107/100],
     #     ['robot_data_60_0_28_01_26_13_41_10.pkl', 65/100],
@@ -228,21 +229,38 @@ if __name__ == "__main__":
     #     ['robot_data_60_0_28_01_26_13_36_10.pkl', 109/100],
     #     ['robot_data_60_0_28_01_26_13_33_20.pkl', 100/100],
     #     ['robot_data_60_0_28_01_26_13_34_28.pkl', 103/100],
-    #     ]
+    # ]
+
+    #TODO: update this list with the new data from task 4, and add the measured distances in meters.
+    files_and_data_step_4 = [
+    ['robot_data_70_0_06_02_26_21_54_37.pkl', (math.sqrt(66**2+60**2))/100], # filename, measured distance in meters
+    ['robot_data_70_0_06_02_26_21_56_10.pkl', (math.sqrt(60**2+62**2))/100],
+    ['robot_data_70_0_06_02_26_21_57_17.pkl', (math.sqrt(75**2+81**2))/100],
+    ['robot_data_70_0_06_02_26_21_58_39.pkl', (math.sqrt(76**2+81**2))/100],
+    ['robot_data_70_0_06_02_26_22_00_18.pkl', (math.sqrt(114**2+110**2))/100],
+    ['robot_data_70_0_06_02_26_22_01_56.pkl', (math.sqrt(99**2+120**2))/100],
+    ['robot_data_70_0_06_02_26_22_02_51.pkl', (math.sqrt(106**2+115**2))/100],
+    ['robot_data_70_0_06_02_26_22_04_10.pkl', (math.sqrt(130**2+167**2))/100],
+    ['robot_data_70_0_06_02_26_22_06_05.pkl', (math.sqrt(160**2+144**2))/100],
+    ['robot_data_70_0_06_02_26_22_08_03.pkl', (math.sqrt(153**2+151**2))/100],
+    ['robot_data_70_0_06_02_26_22_09_53.pkl', (math.sqrt(190**2+195**2))/100],
+    ['robot_data_70_0_06_02_26_22_11_49.pkl', (math.sqrt(196**2+190**2))/100],
+    ]   
+    
 
     # Plot the motion model predictions for a single trial
     if False:
-        filename = './data_stage4/robot_data_70_0_06_02_26_22_01_56.pkl'
+        filename = './data/come_back_to_origin_diff_speed.pkl'
         run_my_model_on_trial(filename)
 
     # Plot the motion model predictions for each trial in a folder
-    if True:
-        directory = ('./data/')
+    if False:
+        directory = ('./data_stage5/')
         plot_many_trial_predictions(directory)
 
     # A list of files to open, process, and plot - for comparing predicted with actual distances
-    if False:
-        directory = ('./data/')    
+    if True:
+        directory = ('./data_stage4/')    
         process_files_and_plot(files_and_data, directory)
 
     # Try to sample with the motion model
