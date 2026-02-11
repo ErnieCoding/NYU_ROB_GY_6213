@@ -19,7 +19,6 @@ def get_file_data(filename):
 
     # The dictionary should have keys ['time', 'control_signal', 'robot_sensor_signal', 'camera_sensor_signal']
     time_list = data_dict['time']
-    print(time_list)
     control_signal_list = data_dict['control_signal']
     robot_sensor_signal_list = data_dict['robot_sensor_signal']
     encoder_count_list = []
@@ -211,7 +210,7 @@ def sample_model(num_samples):
 
 ######### MAIN ########
 if __name__ == "__main__":
-    plot_trial_basics() # call plotting function for data
+    # plot_trial_basics() # call plotting function for data
 
     # print("Printing time list from pickle file:\n\n")
     # get_file_data("data/robot_data_70_-5_07_02_26_00_02_47.pkl")
@@ -233,12 +232,12 @@ if __name__ == "__main__":
 
     # Plot the motion model predictions for a single trial
     if False:
-        filename = './data/robot_data_100_0_05_02_26_18_38_56.pkl'
+        filename = './data_stage4/robot_data_70_0_06_02_26_22_01_56.pkl'
         run_my_model_on_trial(filename)
 
     # Plot the motion model predictions for each trial in a folder
-    if False:
-        directory = ('./data_straight/')
+    if True:
+        directory = ('./data/')
         plot_many_trial_predictions(directory)
 
     # A list of files to open, process, and plot - for comparing predicted with actual distances
