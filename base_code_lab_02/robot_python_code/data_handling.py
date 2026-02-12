@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import math
 import numpy as np
+import random
 
 # Internal Libraries
 import parameters
@@ -78,6 +79,7 @@ def run_my_model_on_trial(filename: str, show_plot: bool = True, plot_color: str
     plt.ylabel("Predicted Y")
     plt.title('Motion Model Predicted XY Traj (m)')
     plt.axis([-0.5, 3, -0.5, 3])
+    plt.savefig(f"./plotted_data/single_trial_plots/{filename.split("/")[2].split(".")[0]}")
     if show_plot:
         if final_traj:
             plt.savefig("./plotted_data/fancy_trajectory/fancy_trajectory.png")
@@ -184,12 +186,21 @@ def process_files_and_plot(files_and_data: list, directory: str) -> None:
 
 # Sample and plot some simulated trials
 def sample_model(num_samples:int):
-    traj_duration = 10
-    for i in range(num_samples):
-        model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
-        traj_x, traj_y, traj_theta = model.generate_simulated_traj(traj_duration)
-        plt.plot(traj_x, traj_y, 'k.')
+    traj_duration = 5
 
+    steering_angles_simulation = [-10, -3, -5, 10, 4, 15, 7, 6, 3, 8]
+
+    for i in range(num_samples):
+        # traj_duration += 5
+        curr_angle = steering_angles_simulation[random.randint(0, 9)]
+        # curr_angle = 0
+        print(f"Angle on trial {i+1}: {curr_angle}\n")
+
+        model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
+        t_list, traj_x, traj_y, traj_theta = model.generate_simulated_traj(traj_duration, curr_angle)
+        plt.plot(traj_x[-1], traj_y[-1], 'k.')
+
+    # plt.axis([-0.1, 0.5, -0.1, 0.5])
     plt.title('Sampling the model')
     plt.xlabel('X (m)')
     plt.ylabel('Y (m)')
@@ -287,7 +298,8 @@ def plot_trial_basics(encoder_data: list, rotational_velocity_data: list) -> Non
     ax3.set_ylabel("Y_g (m)")
     ax3.legend()
     ax3.grid(True)
-
+    
+    plt.savefig("./plotted_data/basic_trial_data/step4_fitting.png")
     plt.tight_layout()
 
 
@@ -395,6 +407,8 @@ def plot_trial_basics(encoder_data: list, rotational_velocity_data: list) -> Non
     ax5.legend()
     ax5.grid(True)
 
+    plt.savefig("./plotted_data/basic_trial_data/step5_fitting.png")
+
     plt.tight_layout()
     plt.show()
 
@@ -468,11 +482,14 @@ if __name__ == "__main__":
     ]
 
     # Plot data from trials + fitted functions and variances
-    # plot_trial_basics(encoder_data, rotational_velocity_data)
+    plot_trial_basics(encoder_data, rotational_velocity_data)
     
+    # time_list, encoder_count_list, velocity_list, steering_angle_list = get_file_data("./data/robot_data_0_20_10_02_26_17_02_43.pkl")
+
+    # print(encoder_count_list)
 
     # Plot the motion model predictions for a single trial
-    if True:
+    if False:
         filename = './data/robot_data_0_0_10_02_26_17_00_41.pkl'
         run_my_model_on_trial(filename, final_traj=True)
 
@@ -488,7 +505,7 @@ if __name__ == "__main__":
 
     # Try to sample with the motion model
     if False:
-        sample_model(200)
+        sample_model(100)
 
 
 

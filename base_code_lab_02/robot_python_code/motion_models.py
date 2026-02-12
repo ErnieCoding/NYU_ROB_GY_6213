@@ -92,16 +92,28 @@ class MyMotionModel:
     
 
     # Coming soon
-    def generate_simulated_traj(self, duration):
+    def generate_simulated_traj(self, duration, steering_angle):
         delta_t = 0.1
-        t_list = []
-        x_list = []
-        y_list = []
-        theta_list = []
+        t_list = [0]
+        x_list = [self.state[0]]
+        y_list = [self.state[1]]
+        theta_list = [self.state[2]]
         t = 0
         encoder_counts = 0
         while t < duration:
+            new_state = self.step_update(
+                encoder_counts,
+                steering_angle,
+                delta_t
+            )
+            
+            x_list.append(new_state[0])
+            y_list.append(new_state[1])
+            theta_list.append(new_state[2])
 
-            t += delta_t 
+            encoder_counts += 20
+            t += delta_t
+            t_list.append(t) 
+        
         return t_list, x_list, y_list, theta_list
             
