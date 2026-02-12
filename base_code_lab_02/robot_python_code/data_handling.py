@@ -40,7 +40,7 @@ def get_file_data(filename:str) -> list:
     
     return time_list, encoder_count_list, velocity_list, steering_angle_list
 
-def run_my_model_on_trial(filename: str, show_plot: bool = True, plot_color: str = 'r') -> None:
+def run_my_model_on_trial(filename: str, show_plot: bool = True, plot_color: str = 'r', final_traj: bool = False) -> None:
     """
     Plots a trajectory of a single file using the motion model
 
@@ -51,33 +51,66 @@ def run_my_model_on_trial(filename: str, show_plot: bool = True, plot_color: str
     """
     time_list, encoder_count_list, velocity_list, steering_angle_list = get_file_data(filename)
 
-    motion_model = motion_models.MyMotionModel([0,0,0], 0)
+    # print("PRINT TIME, ENCODER, and STEERING")
+    # print("=" * 60)
+    # print(time_list)
+    # print("-" * 60)
+    # print(encoder_count_list)
+    # print("-" * 60)
+    # print(steering_angle_list)
+    # print("=" * 60)
+    # print("\n\n")
+
+    motion_model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
     x_list, y_list, theta_list = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
 
-    plt.plot(x_list, y_list, plot_color)
-    plt.title('Motion Model Predicted XY Traj (m)')
-    plt.axis([-0.5, 1.5, -1, 1])
-    if show_plot:
+    # print("PRINT X, Y, and THETA")
+    # print("=" * 60)
+    # print(x_list)
+    # print("-" * 60)
+    # print(y_list)
+    # print("-" * 60)
+    # print(theta_list)
+    # print("=" * 60)    
 
+    plt.plot(x_list, y_list, plot_color)
+    plt.xlabel("Predicted X")
+    plt.ylabel("Predicted Y")
+    plt.title('Motion Model Predicted XY Traj (m)')
+    plt.axis([-0.5, 3, -0.5, 3])
+    if show_plot:
+        if final_traj:
+            plt.savefig("./plotted_data/fancy_trajectory/fancy_trajectory.png")
         plt.show()
 
 
 # Iterate through many trials and plot them as trajectories with motion model
-def plot_many_trial_predictions(directory:str) -> None:
+def plot_many_trial_predictions(directory:str, data_list:list) -> None:
     """
     Iterates through directory for each trial and plots them as trajectories using the motion model
 
     Argument: 
         - directory: path to directory where files are located
     """
+    dir_split = directory.split("_")
     directory_path = Path(directory)
     plot_color_list = ['r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.','r.','k.','g.','c.', 'b.', 'r.','k.','g.','c.', 'b.']
     count = 0
     for item in directory_path.iterdir():
+        if item.name == "robot_data":
+            continue
+
         filename = item.name
         plot_color = plot_color_list[count]
         run_my_model_on_trial(directory + filename, False, plot_color)
+
+        x_g, y_g = data_list[count][3]/100, data_list[count][4]/100
+        plt.scatter(x_g, y_g, color = 'blue', marker="*")
+
         count += 1
+    plt.savefig(f"./plotted_data/many_trial_plots/{dir_split[1].split("/")[0]}.png")
+    plt.legend()
+    plt.grid(True)
     plt.show()
 
 # Calculate the predicted distance from single trial for a motion model
@@ -89,9 +122,12 @@ def run_my_model_to_predict_distance(filename):
         - filename: path to a file to be processed
     """
     time_list, encoder_count_list, velocity_list, steering_angle_list = get_file_data(filename)
-    motion_model = motion_models.MyMotionModel([0,0,0], 0)
-    x_list, _, _ = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
-    distance = x_list[-30]
+    motion_model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
+    x_list, y_list, theta_list = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
+    
+    x_final = x_list[-1]
+    y_final = y_list[-1]
+    distance = x_list[-1]
     
     return distance
 
@@ -132,6 +168,7 @@ def process_files_and_plot(files_and_data: list, directory: str) -> None:
         predicted_distance = run_my_model_to_predict_distance(directory + filename)
         predicted_distance_list.append(predicted_distance)
         print(f"Processing file: {filename} with measured distance: {measured_distance:.2f} m predicted distance: {predicted_distance:.2f} m")
+    
     # Plot predicted and measured distance travelled.
     plt.plot(measured_distance_list+[0], predicted_distance_list+[0], 'ko')
     plt.plot([0,1.7],[0,1.7])
@@ -146,10 +183,10 @@ def process_files_and_plot(files_and_data: list, directory: str) -> None:
 
 
 # Sample and plot some simulated trials
-def sample_model(num_samples:int, iteration:int):
+def sample_model(num_samples:int):
     traj_duration = 10
     for i in range(num_samples):
-        model = motion_models.MyMotionModel([0,0,0], 0)
+        model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
         traj_x, traj_y, traj_theta = model.generate_simulated_traj(traj_duration)
         plt.plot(traj_x, traj_y, 'k.')
 
@@ -407,7 +444,6 @@ if __name__ == "__main__":
     
     # Step 5 trial files and data
     files_and_data_step_5 = [
-        "robot_data_70_15_06_02_26_23_03_33.pkl",
         "robot_data_70_10_06_02_26_23_07_22.pkl", 
         "robot_data_70_15_06_02_26_23_08_15.pkl",
         "robot_data_70_-10_06_02_26_23_10_19.pkl",
@@ -415,8 +451,7 @@ if __name__ == "__main__":
         "robot_data_85_10_06_02_26_23_14_17.pkl", 
         "robot_data_85_-15_06_02_26_23_16_26.pkl",
         "robot_data_70_10_06_02_26_23_20_45.pkl", 
-        "robot_data_70_7_06_02_26_23_23_48.pkl", 
-        "robot_data_70_-10_06_02_26_23_26_13.pkl", 
+        "robot_data_70_7_06_02_26_23_23_48.pkl",  
         "robot_data_70_-10_06_02_26_23_28_44.pkl", 
         "robot_data_70_-7_06_02_26_23_31_53.pkl", 
         "robot_data_85_10_06_02_26_23_33_59.pkl", 
@@ -437,19 +472,19 @@ if __name__ == "__main__":
     
 
     # Plot the motion model predictions for a single trial
-    if False:
-        filename = './data/come_back_to_origin_diff_speed.pkl'
-        run_my_model_on_trial(filename)
+    if True:
+        filename = './data/robot_data_0_0_10_02_26_17_00_41.pkl'
+        run_my_model_on_trial(filename, final_traj=True)
 
     # Plot the motion model predictions for each trial in a folder
     if False:
-        directory = ('./data_stage5/')
-        plot_many_trial_predictions(directory)
+        directory = ('./data_stage4/')
+        plot_many_trial_predictions(directory, encoder_data)
 
     # A list of files to open, process, and plot - for comparing predicted with actual distances
     if False:
         directory = ('./data_stage4/')    
-        process_files_and_plot(files_and_data, directory)
+        process_files_and_plot(files_and_data_step_4, directory)
 
     # Try to sample with the motion model
     if False:
