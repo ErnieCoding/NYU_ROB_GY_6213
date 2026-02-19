@@ -68,15 +68,15 @@ def main():
     
     # Set up the video stream, not needed for lab 1
     if stream_video:
-        video_capture = cv2.VideoCapture(parameters.camera_id, cv2.CAP_V4L2)       
+        video_capture = robot.camera_sensor.cap     
     # Enable frame grabs from the video stream.
     @app.get('/video/frame')
     async def grab_video_frame() -> Response:
         if not video_capture.isOpened():
             return None
-        if video_capture.isOpened():
-            print("Video Capture Open!")
-            print(f"Video Capture Object: {video_capture}")
+        # if video_capture.isOpened():
+            # print("Video Capture Open!")
+            # print(f"Video Capture Object: {video_capture}")
 
         # The `video_capture.read` call is a blocking function.
         # So we run it in a separate thread (default executor) to avoid blocking the event loop.
