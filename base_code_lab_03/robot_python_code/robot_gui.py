@@ -31,9 +31,9 @@ def convert(frame: np.ndarray) -> bytes:
     return imencode_image.tobytes()
     
 # Create the connection with a real camera.
-def connect_with_camera():
-    video_capture = cv2.VideoCapture(1)
-    return video_capture
+# def connect_with_camera():
+#     video_capture = cv2.VideoCapture(0)
+#     return video_capture
     
 def update_video(video_image):
     if stream_video:
@@ -45,6 +45,7 @@ def get_time_in_ms():
 # Create the gui page
 @ui.page('/')
 def main():
+    global stream_video
 
     # Robot variables
     robot = Robot()
@@ -67,18 +68,21 @@ def main():
     
     # Set up the video stream, not needed for lab 1
     if stream_video:
-        video_capture = cv2.VideoCapture(parameters.camera_id)
-    
+        video_capture = cv2.VideoCapture(parameters.camera_id, cv2.CAP_V4L2)       
     # Enable frame grabs from the video stream.
     @app.get('/video/frame')
     async def grab_video_frame() -> Response:
         if not video_capture.isOpened():
-            return placeholder
+            return None
+        if video_capture.isOpened():
+            print("Video Capture Open!")
+            print(f"Video Capture Object: {video_capture}")
+
         # The `video_capture.read` call is a blocking function.
         # So we run it in a separate thread (default executor) to avoid blocking the event loop.
         _, frame = await run.io_bound(video_capture.read)
         if frame is None:
-            return placeholder
+            return None
         # `convert` is a CPU-intensive function, so we run it in a separate process to avoid blocking the event loop and GIL.
         jpeg = await run.cpu_bound(convert, frame)
         return Response(content=jpeg, media_type='image/jpeg')
@@ -267,5 +271,5 @@ def main():
     ui.timer(0.1, control_loop)
 
 # Run the gui
-ui.run(native=True)
+ui.run(native=False)
 
