@@ -97,7 +97,7 @@ def main():
 
                 # Example usage:
                 yaw, pitch, roll = rvec_to_ypr(r)
-                theta_robot = yaw_for_robot_forward_neg_x(yaw)
+                theta_robot = yaw_for_robot_forward_neg_x(-yaw)
                 print(f"yaw={math.degrees(yaw):.1f} deg, pitch={math.degrees(pitch):.1f} deg, roll={math.degrees(roll):.1f} deg")
                 print(f"theta_robot (heading)={math.degrees(theta_robot):.1f} deg\n")
                 #convert to degrees
