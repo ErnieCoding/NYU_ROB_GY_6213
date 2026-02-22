@@ -31,7 +31,7 @@ class ExtendedKalmanFilter:
         G_u_t = self.get_G_u(self.state_mean, delta_t)
         R_t = self.get_R(s)
         
-        sigma_t_pred = G_x_t * self.state_covariance * np.transpose(G_x_t) + G_u_t @ R_t @ np.transpose(G_u_t)
+        sigma_t_pred = G_x_t @ self.state_covariance @ np.transpose(G_x_t) + G_u_t @ R_t @ np.transpose(G_u_t)
         
         return sigma_t_pred, mu_pred
 
@@ -40,13 +40,13 @@ class ExtendedKalmanFilter:
         H_t = self.get_H()
         Q_t = self.get_Q()
 
-        inverse = np.linalg.inv(H_t * self.predicted_state_covariance * np.transpose(H_t) + Q_t)
+        inverse = np.linalg.inv(H_t @ self.predicted_state_covariance @ np.transpose(H_t) + Q_t)
 
-        Kalman_gain = self.predicted_state_covariance * np.transpose(H_t) * inverse
+        Kalman_gain = self.predicted_state_covariance @ np.transpose(H_t) @ inverse
 
-        self.state_mean = self.predicted_state_mean + Kalman_gain * (z_t - self.get_h_function(self.predicted_state_mean))
+        self.state_mean = self.predicted_state_mean + Kalman_gain @ (z_t - self.get_h_function(self.predicted_state_mean))
 
-        self.state_covariance = (np.eye(3) - Kalman_gain * H_t) * self.predicted_state_covariance
+        self.state_covariance = (np.eye(3) - Kalman_gain * H_t) @ self.predicted_state_covariance
 
     # Function to calculate distance from encoder counts
     def distance_travelled_s(self, encoder_counts):
@@ -78,12 +78,7 @@ class ExtendedKalmanFilter:
         """
         Converts predicted model state to camera space measurements z_t = [tvec_x, tvec_y, rvec_z]
         """
-        x, y, theta = x_t
-        tvec_x = 0
-        tvec_y = 0
-        rvec_z = 0
-
-        return tvec_x, tvec_y, rvec_z
+        return x_t
     
     # This function returns a matrix with the partial derivatives dg/dx
     # g outputs x_t, y_t, theta_t, and we take derivatives wrt inputs x_tm1, y_tm1, theta_tm1
@@ -121,7 +116,7 @@ class KalmanFilterPlot:
         self.ax = ax
         self.fig = fig
 
-    def update(self, state_mean, state_covaraiance):
+    def update(self, state_mean, state_covaraiance, t):
         plt.clf()
 
         # Plot covariance ellipse
@@ -140,7 +135,7 @@ class KalmanFilterPlot:
         plt.ylabel('Y(m)')
         plt.axis([-0.25, 2, -1, 1])
         plt.grid()
-        plt.draw()
+        plt.savefig(f"./kalman_filter_plots/plot_{t}")
         plt.pause(0.1)
 
 
@@ -148,7 +143,7 @@ class KalmanFilterPlot:
 def offline_efk():
 
     # Get data to filter
-    filename = './professor_data/robot_data_0_0_04_02_26_19_53_05.pkl'
+    filename = './data/robot_data_0_0_20_02_26_16_49_40.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
@@ -167,15 +162,15 @@ def offline_efk():
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = np.array([row[3][0],row[3][1],row[3][5]]) # camera_sensor_signal
 
-        print(z_t)
-
         # Run the EKF for a time step
         extended_kalman_filter.update(u_t, z_t, delta_t)
-        print(f"State Mean: \n{extended_kalman_filter.state_mean}\n")
-        print(f"State Covariance: \n{extended_kalman_filter.state_covariance}\n")
-        print(f"State Predicted Mean: \n{extended_kalman_filter.predicted_state_mean}\n")
-        print(f"State Predicted Covariance: \n{extended_kalman_filter.predicted_state_covariance}\n")
-        # kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2])
+        
+        kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2], t)
+    
+    print(f"State Mean: \n{extended_kalman_filter.state_mean}\n")
+    print(f"State Covariance: \n{extended_kalman_filter.state_covariance}\n")
+    print(f"State Predicted Mean: \n{extended_kalman_filter.predicted_state_mean}\n")
+    print(f"State Predicted Covariance: \n{extended_kalman_filter.predicted_state_covariance}\n")
 
 
 ####### MAIN #######
