@@ -1,3 +1,9 @@
+# Variance X: 0.03991543833753128
+
+# Variance Y: 0.0258320538210973
+
+# Variance Theta: 194.3414817275661
+
 import math
 from matplotlib import pyplot as plt
 import cv2
@@ -124,12 +130,12 @@ for i in range(len(x_measured)):
     sum_theta += theta_difference ** 2
     print(f"SUM THETA: {sum_theta}\n")
 
-    # print(f"MEASURED X: {x_measured[i] / 100}\n")
-    # print(f"MEASURED Y: {y_measured[i] / 100}\n\n")
+    print(f"MEASURED X: {x_measured[i] / 100}\n")
+    print(f"MEASURED Y: {y_measured[i] / 100}\n\n")
     tvec_diff_x = abs(tvec_init_x - tvec[i][0])
     tvec_diff_y = abs(tvec_init_y - tvec[i][1])
-    # print(f"TVEC_DIFF_X: {tvec_diff_x}\n")
-    # print(f"TVEC_DIFF_Y: {tvec_diff_y}\n\n")
+    print(f"TVEC_DIFF_X: {tvec_diff_x}\n")
+    print(f"TVEC_DIFF_Y: {tvec_diff_y}\n\n")
 
     x_camera.append(tvec_diff_x * 100)
     y_camera.append(tvec_diff_y * 100)
@@ -137,14 +143,14 @@ for i in range(len(x_measured)):
     x_difference = (x_measured[i]/100) - tvec_diff_x
     y_difference = (y_measured[i]/100) - tvec_diff_y
 
-    # print(f"X_DIFF: {x_difference}\n")
-    # print(f"Y_DIFF: {y_difference}\n\n")
+    print(f"X_DIFF: {x_difference}\n")
+    print(f"Y_DIFF: {y_difference}\n\n")
 
     sum_x += x_difference ** 2
     sum_y += y_difference ** 2
 
-    # print(f"SUM X: {sum_x}\n")
-    # print(f"SUM Y: {sum_y}\n\n")
+    print(f"SUM X: {sum_x}\n")
+    print(f"SUM Y: {sum_y}\n\n")
     print("-------------------------------")
 
 
@@ -162,10 +168,7 @@ var_theta = (sum_theta/(len(angles) - 1))
 
 print(f"Variance X: {var_x}\n")
 print(f"Variance Y: {var_y}\n")
-print(f"Variance Theta: {var_theta}")
+print(f"Variance Theta: {var_theta}\n\n")
 
-# Variance X: 0.03991543833753128
-
-# Variance Y: 0.0258320538210973
-
-# Variance Theta: 194.3414817275661
+print(f"Camera X-coordinates:\n{x_camera}\n")
+print(f"Camera Y-coordinates:\n{y_camera}")

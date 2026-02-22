@@ -14,59 +14,104 @@ class ExtendedKalmanFilter:
         self.state_mean = x_0
         self.state_covariance = Sigma_0
         self.predicted_state_mean = [0,0,0]
-        self.predicted_state_covariance = parameters.I3 * 1.0
+        self.predicted_state_covariance = np.array([[1,0,0], [0,1,0], [0,0,1]]) * 1.0
         self.last_encoder_counts = encoder_counts_0
 
     # Call the prediction and correction steps
     def update(self, u_t, z_t, delta_t):
-        return
+        self.predicted_state_covariance, self.predicted_state_mean = self.prediction_step(u_t, delta_t)
+        
+        self.correction_step(z_t)
 
     # Set the EKF's predicted state mean and covariance matrix
     def prediction_step(self, u_t, delta_t):
-        return
+        mu_pred, s = self.g_function(self.state_mean, u_t, delta_t)
+
+        G_x_t = self.get_G_x(self.state_mean, s)
+        G_u_t = self.get_G_u(self.state_mean, delta_t)
+        R_t = self.get_R(s)
+        
+        sigma_t_pred = G_x_t * self.state_covariance * np.transpose(G_x_t) + G_u_t @ R_t @ np.transpose(G_u_t)
+        
+        return sigma_t_pred, mu_pred
 
     # Set the EKF's corrected state mean and covariance matrix
     def correction_step(self, z_t):
-        return
+        H_t = self.get_H()
+        Q_t = self.get_Q()
+
+        inverse = np.linalg.inv(H_t * self.predicted_state_covariance * np.transpose(H_t) + Q_t)
+
+        Kalman_gain = self.predicted_state_covariance * np.transpose(H_t) * inverse
+
+        self.state_mean = self.predicted_state_mean + Kalman_gain * (z_t - self.get_h_function(self.predicted_state_mean))
+
+        self.state_covariance = (np.eye(3) - Kalman_gain * H_t) * self.predicted_state_covariance
 
     # Function to calculate distance from encoder counts
     def distance_travelled_s(self, encoder_counts):
-        return 0    
+        s = 0.0003063 * encoder_counts
+        return s    
             
     # Function to calculate rotational velocity from steering and dist travelled or speed
-    def rotational_velocity_w(self, steering_angle_command):        
-        return 0
+    def rotational_velocity_w(self, steering_angle_command): 
+        w = -0.0128 * steering_angle_command + 0.0016       
+        return w
 
     # The nonlinear transition equation that provides new states from past states
     def g_function(self, x_tm1, u_t, delta_t):
-        x_t = x_tm1
-        s = 0
+        s = self.distance_travelled_s(u_t[0]-self.last_encoder_counts)
+        self.last_encoder_counts = u_t[0]
+
+        w = self.rotational_velocity_w(u_t[1])
+
+        x = x_tm1[0] + s * math.cos(x_tm1[2])
+        y = x_tm1[1] + s * math.sin(x_tm1[2])
+        theta = x_tm1[2] + w * delta_t
+
+        x_t = np.array([x, y, theta])
         return x_t, s
     
+    #TODO: CHANGE IF INCORRECT
     # The nonlinear measurement function
-    def get_h_function(self, x_t):
-        return x_t
+    def get_h_function(self, x_t:list) -> list:
+        """
+        Converts predicted model state to camera space measurements z_t = [tvec_x, tvec_y, rvec_z]
+        """
+        x, y, theta = x_t
+        tvec_x = 0
+        tvec_y = 0
+        rvec_z = 0
+
+        return tvec_x, tvec_y, rvec_z
     
     # This function returns a matrix with the partial derivatives dg/dx
     # g outputs x_t, y_t, theta_t, and we take derivatives wrt inputs x_tm1, y_tm1, theta_tm1
-    def get_G_x(self, x_tm1, s):       
-        return parameters.I3
+    def get_G_x(self, x_tm1, s):
+        G_02=-s*math.sin(x_tm1[2])
+        G_22 = s * math.cos(x_tm1[2])
+        return np.array([[1, 0, G_02], [0, 1, G_22], [0, 0, 1]])
 
     # This function returns a matrix with the partial derivatives dg/du
     def get_G_u(self, x_tm1, delta_t):                
-        return parameters.I3
+        return np.array([[math.cos(x_tm1[2]), 0], [math.sin(x_tm1[2]), 0], [0, delta_t]])
 
+    #TODO: CHANGE IF INCORRECT 
     # This function returns a matrix with the partial derivatives dh_t/dx_t
     def get_H(self):
-        return parameters.I3
+        return np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
     
     # This function returns the R_t matrix which contains transition function covariance terms.
     def get_R(self, s):
-        return parameters.I3
+        var_s = 0.000000585994 * (s/0.03063)
+
+        var_w = 0.0009
+
+        return np.array([[var_s, 0], [0, var_w]])
 
     # This function returns the Q_t matrix which contains measurement covariance terms.
     def get_Q(self):
-        return parameters.I3
+        return parameters.Q_t
 
 class KalmanFilterPlot:
 
@@ -103,12 +148,12 @@ class KalmanFilterPlot:
 def offline_efk():
 
     # Get data to filter
-    filename = './data/robot_data_68_0_06_02_26_17_12_19.pkl'
+    filename = './professor_data/robot_data_0_0_04_02_26_19_53_05.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
     x_0 = [ekf_data[0][3][0]+.5, ekf_data[0][3][1], ekf_data[0][3][5]]
-    Sigma_0 = parameters.I3
+    Sigma_0 = np.array([[1,0,0], [0,1,0], [0,0,1]])
     encoder_counts_0 = ekf_data[0][2].encoder_counts
     extended_kalman_filter = ExtendedKalmanFilter(x_0, Sigma_0, encoder_counts_0)
 
@@ -122,11 +167,19 @@ def offline_efk():
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = np.array([row[3][0],row[3][1],row[3][5]]) # camera_sensor_signal
 
+        print(z_t)
+
         # Run the EKF for a time step
         extended_kalman_filter.update(u_t, z_t, delta_t)
-        kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2])
+        print(f"State Mean: \n{extended_kalman_filter.state_mean}\n")
+        print(f"State Covariance: \n{extended_kalman_filter.state_covariance}\n")
+        print(f"State Predicted Mean: \n{extended_kalman_filter.predicted_state_mean}\n")
+        print(f"State Predicted Covariance: \n{extended_kalman_filter.predicted_state_covariance}\n")
+        # kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2])
 
 
 ####### MAIN #######
-if False:
-    offline_efk()
+if __name__ == "__main__":
+
+    if True:
+        offline_efk()
