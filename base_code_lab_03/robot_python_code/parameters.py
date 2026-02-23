@@ -3,14 +3,14 @@ import math
 import numpy as np
 
 # UDP parameters
-localIP = "192.168.0.200" # Put your laptop computer's IP here 199
-arduinoIP = "192.168.0.199" # Put your arduino's IP here 200
+localIP = "192.168.0.199" # Put your laptop computer's IP here 199
+arduinoIP = "192.168.0.200" # Put your arduino's IP here 200
 localPort = 4010
 arduinoPort = 4010
 bufferSize = 1024
 
 # Camera parameters
-camera_id = 0
+camera_id = 1
 marker_length = 0.067
 camera_matrix = np.array([[1.03843829e+03, 0.00000000e+00, 5.70058553e+02],
   [0.00000000e+00, 1.06325837e+03, 3.09600558e+02],
@@ -32,6 +32,9 @@ trial_time = 10000 # milliseconds
 extra_trial_log_time = 2000 # milliseconds
 
 # KF parameters
-Q_t = np.array([[0.03991543833753128, 0, 0],[0, 0.0258320538210973, 0], [0, 0, math.radians(math.sqrt(194.3414817275661)) ** 2]])
+# Var(err_x)     = 0.0029696401 m^2
+# Var(err_y)     = 0.0262374521 m^2
+# Var(err_theta) = 0.0104829944 rad^2
+Q_t = np.array([[0.0029696401, 0, 0],[0, 0.0262374521, 0], [0, 0, 0.0104829944]])
 I3 = 1.0
 covariance_plot_scale = 100

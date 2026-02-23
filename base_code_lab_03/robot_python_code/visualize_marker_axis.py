@@ -94,12 +94,15 @@ def main():
                 t = tvecs[i].reshape(3)
                 r = rvecs[i].reshape(3)
        
-
+                cv2.putText(frame, f"tvec: {t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}", (10, 30 + 30*i), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2) 
+                cv2.putText(frame, f"rvec: {r[0]:.2f}, {r[1]:.2f}, {r[2]:.2f}", (10, 50 + 30*i), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
+                
                 # Example usage:
                 yaw, pitch, roll = rvec_to_ypr(r)
                 theta_robot = yaw_for_robot_forward_neg_x(-yaw)
                 print(f"yaw={math.degrees(yaw):.1f} deg, pitch={math.degrees(pitch):.1f} deg, roll={math.degrees(roll):.1f} deg")
                 print(f"theta_robot (heading)={math.degrees(theta_robot):.1f} deg\n")
+                cv2.putText(frame, f"theta_robot: {math.degrees(theta_robot):.1f} deg", (10, 70 + 30*i), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 0), 2)
                 #convert to degrees
                 # print(f"rvec_deg=({np.degrees(r[0]):.1f}, {np.degrees(r[1]):.1f}, {np.degrees(r[2]):.1f})")
 

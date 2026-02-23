@@ -7,7 +7,7 @@ from matplotlib.patches import Ellipse
 # Local libraries
 import parameters
 import data_handling
-
+import cv2
 # Main class
 class ExtendedKalmanFilter:
     def __init__(self, x_0, Sigma_0, encoder_counts_0):
@@ -115,6 +115,9 @@ class KalmanFilterPlot:
         fig, ax = plt.subplots()
         self.ax = ax
         self.fig = fig
+        plt.ion()                 # interactive mode ON
+        plt.show(block=False)     # show ONCE, non-blocking
+
 
     def update(self, state_mean, state_covaraiance, t):
         plt.clf()
@@ -133,17 +136,55 @@ class KalmanFilterPlot:
         plt.plot([state_mean[0], state_mean[0]+ self.dir_length*math.cos(state_mean[2]) ], [state_mean[1], state_mean[1]+ self.dir_length*math.sin(state_mean[2]) ],'r')
         plt.xlabel('X(m)')
         plt.ylabel('Y(m)')
-        plt.axis([-0.25, 2, -1, 1])
+        plt.axis([-0.25, 2, -1, 2])
+        # plt.axis([-0.25, 2, -1, 1])
         plt.grid()
-        plt.savefig(f"./kalman_filter_plots/plot_{t}")
-        plt.pause(0.1)
+        # plt.savefig(f"kalman_filter_plots/plot_{t}")
+
+        # redraw the existing window instead of reopening/locking
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.flush_events()
+        plt.pause(0.001)
+
+    
+def transform_camera_to_world(tvec, rvec):
+    # Ensure inputs are float32 numpy arrays
+    ##THIS IS HARCODED AND CHANGES EVERY TIME YOU CHANGE CAMERA POSITION, SO UPDATE BEFORE RUNNING EKF
+    tvec_init = [-0.38739399,  0.04475379 , 0.96047396]
+    rvec_init = [2.46267966, -0.03492479 , 0.32852154]
+    tvec = np.array(tvec, dtype=np.float32)
+    rvec = np.array(rvec, dtype=np.float32)
+    t_init = np.array(tvec_init, dtype=np.float32)
+    r_init = np.array(rvec_init, dtype=np.float32)
+
+    # 1. Rotation Matrix for Camera Tilt at Origin
+    R_init, _ = cv2.Rodrigues(r_init)
+
+    # 2. Position Transformation (Un-tilting)
+    t_diff = tvec - t_init
+    # Project back to World Frame using the Transpose
+    p_world_meters = np.dot(R_init.T, t_diff)
+
+    # 3. Unit Conversion (meters to cm)
+    x_world = p_world_meters[0] 
+    y_world = p_world_meters[1] 
+
+    # 4. Heading Transformation
+    R_curr, _ = cv2.Rodrigues(rvec)
+    R_rel = np.dot(R_init.T, R_curr)
+    yaw_rad = np.arctan2(R_rel[1, 0], R_rel[0, 0])
+    theta_world = np.degrees(yaw_rad)
+    # Wrap to [-180, 180]
+    theta_world = (theta_world + 180) % 360 - 180
+
+    return x_world, y_world, math.radians(theta_world)
 
 
 # Code to run your EKF offline with a data file.
 def offline_efk():
 
     # Get data to filter
-    filename = './data/robot_data_0_0_20_02_26_16_49_40.pkl'
+    filename = './data/robot_data_0_0_22_02_26_23_06_43.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
@@ -160,18 +201,22 @@ def offline_efk():
         row = ekf_data[t]
         delta_t = ekf_data[t][0] - ekf_data[t-1][0] # time step size
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
-        z_t = np.array([row[3][0],row[3][1],row[3][5]]) # camera_sensor_signal
+        # z_t = np.array([row[3][0],row[3][1],row[3][5]]) # camera_sensor_signal
+        ##CHANGED TO OUR Z WHICH IS IN WORLD FRAME, NOT CAMERA: 
+        z_t = np.array([row[3][0],row[3][1],row[3][2],row[3][3],row[3][4],row[3][5]])
+        tvec = row[3][0:3]
+        rvec = row[3][3:6]
+        z_t = np.array(transform_camera_to_world(tvec, rvec))
 
+        print(f"Time: {row[0]}, u_t: {u_t}, z_t: {z_t}, delta_t: {delta_t}")
         # Run the EKF for a time step
         extended_kalman_filter.update(u_t, z_t, delta_t)
-        
-        kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2], t)
     
+        kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2],t)
     print(f"State Mean: \n{extended_kalman_filter.state_mean}\n")
     print(f"State Covariance: \n{extended_kalman_filter.state_covariance}\n")
     print(f"State Predicted Mean: \n{extended_kalman_filter.predicted_state_mean}\n")
     print(f"State Predicted Covariance: \n{extended_kalman_filter.predicted_state_covariance}\n")
-
 
 ####### MAIN #######
 if __name__ == "__main__":

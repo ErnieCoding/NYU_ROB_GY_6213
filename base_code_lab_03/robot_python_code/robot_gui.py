@@ -265,7 +265,7 @@ def main():
         encoder_count_label.set_text(robot.robot_sensor_signal.encoder_counts)
         #update_lidar_data()
         #show_lidar_plot()
-        show_localization_plot()
+        # show_localization_plot()
         update_video(video_image)
         
     ui.timer(0.1, control_loop)
