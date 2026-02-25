@@ -13,7 +13,7 @@ import data_handling
 import cv2
 # Main class
 class ExtendedKalmanFilter:
-    def __init__(self, x_0, Sigma_0, encoder_counts_0, only_prediction:bool):
+    def __init__(self, x_0, Sigma_0, encoder_counts_0, only_prediction:bool = False):
         self.state_mean = x_0
         self.state_covariance = Sigma_0
         self.predicted_state_mean = [0,0,0]
@@ -50,9 +50,14 @@ class ExtendedKalmanFilter:
 
         Kalman_gain = self.predicted_state_covariance @ np.transpose(H_t) @ inverse
 
-        self.state_mean = self.predicted_state_mean + Kalman_gain @ (z_t - self.get_h_function(self.predicted_state_mean))
+        # print(f"\nKALMAN GAIN AT STEP: \n{Kalman_gain}\nDIAGONAL:\n {np.diag(Kalman_gain)}")
 
-        self.state_covariance = (np.eye(3) - Kalman_gain * H_t) @ self.predicted_state_covariance
+
+        residual = z_t - self.get_h_function(self.predicted_state_mean)
+        residual[2] = (residual[2] + np.pi) % (2 * np.pi) - np.pi
+        self.state_mean = self.predicted_state_mean + Kalman_gain @ residual
+
+        self.state_covariance = (np.eye(3) - Kalman_gain @ H_t) @ self.predicted_state_covariance
 
     # Function to calculate distance from encoder counts
     def distance_travelled_s(self, encoder_counts):
@@ -89,13 +94,14 @@ class ExtendedKalmanFilter:
     # This function returns a matrix with the partial derivatives dg/dx
     # g outputs x_t, y_t, theta_t, and we take derivatives wrt inputs x_tm1, y_tm1, theta_tm1
     def get_G_x(self, x_tm1, s):
-        G_02=-s*math.sin(x_tm1[2])
-        G_22 = s * math.cos(x_tm1[2])
-        return np.array([[1, 0, G_02], [0, 1, G_22], [0, 0, 1]])
+        G_02= -s*math.sin(x_tm1[2])
+        G_12 = s * math.cos(x_tm1[2])
+        return np.array([[1, 0, G_02], [0, 1, G_12], [0, 0, 1]])
 
     # This function returns a matrix with the partial derivatives dg/du
-    def get_G_u(self, x_tm1, delta_t):                
-        return np.array([[math.cos(x_tm1[2]), 0], [math.sin(x_tm1[2]), 0], [0, delta_t]])
+    def get_G_u(self, x_tm1, delta_t):     
+        m = -0.0128           
+        return np.array([[math.cos(x_tm1[2]), 0], [math.sin(x_tm1[2]), 0], [0, m * delta_t]])
 
     #TODO: CHANGE IF INCORRECT 
     # This function returns a matrix with the partial derivatives dh_t/dx_t
@@ -155,8 +161,11 @@ class KalmanFilterPlot:
 def transform_camera_to_world(tvec, rvec):
     # Ensure inputs are float32 numpy arrays
     ##THIS IS HARCODED AND CHANGES EVERY TIME YOU CHANGE CAMERA POSITION, SO UPDATE BEFORE RUNNING EKF
-    tvec_init = [-0.21500975, 0.56345664, 0.87650994]
-    rvec_init = [2.72888006, 0.45845892, 0.90720317]
+    # tvec_init = [-0.21500975, 0.56345664, 0.87650994]
+    # rvec_init = [2.72888006, 0.45845892, 0.90720317]
+
+    tvec_init = [-0.49274365, 0.05354998, 1.29572172]
+    rvec_init = [ 2.17807045, -0.29410592, 0.29292633]
 
     tvec = np.array(tvec, dtype=np.float32)
     rvec = np.array(rvec, dtype=np.float32)
@@ -190,11 +199,11 @@ def transform_camera_to_world(tvec, rvec):
 def offline_efk(only_prediction = False):
 
     # Get data to filter
-    filename = './data_trajectory_complex/robot_data_0_0_24_02_26_16_16_58.pkl'
+    filename = './data_trajectory_complex/robot_data_0_0_24_02_26_16_19_18.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
-    row_num = 100
+    row_num = 0
 
     tvec = [ekf_data[row_num][3][0], ekf_data[row_num][3][1], ekf_data[row_num][3][2]]
     rvec = [ekf_data[row_num][3][3], ekf_data[row_num][3][4], ekf_data[row_num][3][5]]
@@ -205,7 +214,7 @@ def offline_efk(only_prediction = False):
     # print(f"X_tm1[5]: {ekf_data[0][3][5]}\n")
 
     Sigma_0 = np.array([[1,0,0], [0,1,0], [0,0,1]])
-    encoder_counts_0 = ekf_data[0][2].encoder_counts
+    encoder_counts_0 = ekf_data[row_num][2].encoder_counts
     extended_kalman_filter = ExtendedKalmanFilter(x_0, Sigma_0, encoder_counts_0, only_prediction)
 
     # Create plotting tool for ekf
@@ -213,11 +222,10 @@ def offline_efk(only_prediction = False):
 
     # Loop over sim data
     for t in range(1, len(ekf_data)):
-        row = ekf_data[t]
+        row = ekf_data[t] # Current row of data
+
         delta_t = ekf_data[t][0] - ekf_data[t-1][0] # time step size
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
-        # z_t = np.array([row[3][0],row[3][1],row[3][5]]) # camera_sensor_signal
-        ##CHANGED TO OUR Z WHICH IS IN WORLD FRAME, NOT CAMERA: 
         z_t = np.array([row[3][0],row[3][1],row[3][2],row[3][3],row[3][4],row[3][5]])
         tvec = row[3][0:3]
         rvec = row[3][3:6]

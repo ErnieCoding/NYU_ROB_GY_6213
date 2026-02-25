@@ -16,6 +16,9 @@ from robot import Robot
 import robot_python_code
 import parameters
 
+matplotlib.use('Agg')
+
+
 # Global variables
 logging = False
 stream_video = True
@@ -182,21 +185,22 @@ def main():
             plt.style.use('dark_background')
             plt.tick_params(axis='x', colors='lightgray')
             plt.tick_params(axis='y', colors='lightgray')
-            
             sigma = 3
             covar_matrix = parameters.covariance_plot_scale * robot.extended_kalman_filter.state_covariance[0:2,0:2]#np.array([[sigma, -sigma*0.9],[ -sigma*0.9, sigma]])
             x_est = robot.extended_kalman_filter.state_mean[0]
             y_est = robot.extended_kalman_filter.state_mean[1]
+            print("x_est",x_est)
+            print("y:",y_est)
+            print
             lambda_, v = np.linalg.eig(covar_matrix)
             lambda_ = np.sqrt(lambda_)
             ell = Ellipse(xy=(x_est, y_est), alpha=0.5, facecolor='red',width=lambda_[0], height=lambda_[1], angle=np.rad2deg(np.arctan2(*v[:,0][::-1])))
             ax = fig.gca()
             ax.add_artist(ell)
-
             plt.plot(x_est, y_est, 'ro')
 
             plt.grid(True)
-            plot_range = 1
+            plot_range = 5
             plt.xlim(-plot_range, plot_range)
             plt.ylim(-plot_range, plot_range)
 
@@ -265,7 +269,7 @@ def main():
         encoder_count_label.set_text(robot.robot_sensor_signal.encoder_counts)
         #update_lidar_data()
         #show_lidar_plot()
-        # show_localization_plot()
+        show_localization_plot()
         update_video(video_image)
         
     ui.timer(0.1, control_loop)
