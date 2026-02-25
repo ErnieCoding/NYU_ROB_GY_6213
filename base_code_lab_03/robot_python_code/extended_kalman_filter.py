@@ -1,8 +1,11 @@
 # External libraries
 import numpy as np
 import math
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+import argparse
 
 # Local libraries
 import parameters
@@ -10,18 +13,21 @@ import data_handling
 import cv2
 # Main class
 class ExtendedKalmanFilter:
-    def __init__(self, x_0, Sigma_0, encoder_counts_0):
+    def __init__(self, x_0, Sigma_0, encoder_counts_0, only_prediction:bool):
         self.state_mean = x_0
         self.state_covariance = Sigma_0
         self.predicted_state_mean = [0,0,0]
         self.predicted_state_covariance = np.array([[1,0,0], [0,1,0], [0,0,1]]) * 1.0
         self.last_encoder_counts = encoder_counts_0
+        self.only_prediction = only_prediction
 
     # Call the prediction and correction steps
     def update(self, u_t, z_t, delta_t):
-        self.predicted_state_covariance, self.predicted_state_mean = self.prediction_step(u_t, delta_t)
-        
-        self.correction_step(z_t)
+        if self.only_prediction or z_t is None:
+            self.state_covariance, self.state_mean = self.prediction_step(u_t, delta_t)
+        else:
+            self.predicted_state_covariance, self.predicted_state_mean = self.prediction_step(u_t, delta_t)
+            self.correction_step(z_t)
 
     # Set the EKF's predicted state mean and covariance matrix
     def prediction_step(self, u_t, delta_t):
@@ -136,8 +142,7 @@ class KalmanFilterPlot:
         plt.plot([state_mean[0], state_mean[0]+ self.dir_length*math.cos(state_mean[2]) ], [state_mean[1], state_mean[1]+ self.dir_length*math.sin(state_mean[2]) ],'r')
         plt.xlabel('X(m)')
         plt.ylabel('Y(m)')
-        plt.axis([-0.25, 2, -1, 2])
-        # plt.axis([-0.25, 2, -1, 1])
+        plt.axis([-2, 2, -2, 3])
         plt.grid()
         # plt.savefig(f"kalman_filter_plots/plot_{t}")
 
@@ -150,8 +155,9 @@ class KalmanFilterPlot:
 def transform_camera_to_world(tvec, rvec):
     # Ensure inputs are float32 numpy arrays
     ##THIS IS HARCODED AND CHANGES EVERY TIME YOU CHANGE CAMERA POSITION, SO UPDATE BEFORE RUNNING EKF
-    tvec_init = [-0.38739399,  0.04475379 , 0.96047396]
-    rvec_init = [2.46267966, -0.03492479 , 0.32852154]
+    tvec_init = [-0.21500975, 0.56345664, 0.87650994]
+    rvec_init = [2.72888006, 0.45845892, 0.90720317]
+
     tvec = np.array(tvec, dtype=np.float32)
     rvec = np.array(rvec, dtype=np.float32)
     t_init = np.array(tvec_init, dtype=np.float32)
@@ -181,17 +187,26 @@ def transform_camera_to_world(tvec, rvec):
 
 
 # Code to run your EKF offline with a data file.
-def offline_efk():
+def offline_efk(only_prediction = False):
 
     # Get data to filter
-    filename = './data/robot_data_0_0_22_02_26_23_06_43.pkl'
+    filename = './data_trajectory_complex/robot_data_0_0_24_02_26_16_16_58.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
-    x_0 = [ekf_data[0][3][0]+.5, ekf_data[0][3][1], ekf_data[0][3][5]]
+    row_num = 100
+
+    tvec = [ekf_data[row_num][3][0], ekf_data[row_num][3][1], ekf_data[row_num][3][2]]
+    rvec = [ekf_data[row_num][3][3], ekf_data[row_num][3][4], ekf_data[row_num][3][5]]
+    x_0 = np.array(transform_camera_to_world(tvec, rvec))
+    print(len(ekf_data))
+    # print(f"X_tm1[0]: {ekf_data[0][3][0]}\n")
+    # print(f"X_tm1[1]: {ekf_data[0][3][1]}\n")
+    # print(f"X_tm1[5]: {ekf_data[0][3][5]}\n")
+
     Sigma_0 = np.array([[1,0,0], [0,1,0], [0,0,1]])
     encoder_counts_0 = ekf_data[0][2].encoder_counts
-    extended_kalman_filter = ExtendedKalmanFilter(x_0, Sigma_0, encoder_counts_0)
+    extended_kalman_filter = ExtendedKalmanFilter(x_0, Sigma_0, encoder_counts_0, only_prediction)
 
     # Create plotting tool for ekf
     kalman_filter_plot = KalmanFilterPlot()
@@ -206,7 +221,10 @@ def offline_efk():
         z_t = np.array([row[3][0],row[3][1],row[3][2],row[3][3],row[3][4],row[3][5]])
         tvec = row[3][0:3]
         rvec = row[3][3:6]
-        z_t = np.array(transform_camera_to_world(tvec, rvec))
+        if tvec == [0, 0, 0] or rvec == [0, 0, 0]:
+            z_t = None
+        else:
+            z_t = np.array(transform_camera_to_world(tvec, rvec))
 
         print(f"Time: {row[0]}, u_t: {u_t}, z_t: {z_t}, delta_t: {delta_t}")
         # Run the EKF for a time step
@@ -221,5 +239,9 @@ def offline_efk():
 ####### MAIN #######
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--only_prediction", action="store_true", help="Run EKF with only the prediction step")
+
+    args = parser.parse_args()
     if True:
-        offline_efk()
+        offline_efk(args.only_prediction)

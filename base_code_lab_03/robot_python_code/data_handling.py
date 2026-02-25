@@ -85,8 +85,8 @@ def plot_trial_basics(filename):
 # Plot a trajectory using the motion model, input data ste from a single trial.
 def run_my_model_on_trial(filename, show_plot = True, plot_color = 'ko'):
     time_list, encoder_count_list, velocity_list, steering_angle_list, x_camera_list, y_camera_list, z_camera_list, yaw_camera_list = get_file_data(filename)
-    
-    motion_model = motion_models.MyMotionModel([0,0,0], 0)
+ 
+    motion_model = motion_models.MyMotionModel([0,0,math.radians(45)], 0)
     x_list, y_list, theta_list = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
 
     plt.plot(x_list, y_list,plot_color)
@@ -287,7 +287,7 @@ if False:
 
 # Plot the motion model predictions for each trial in a folder
 if False:
-    directory = ('./data_straight/')
+    directory = ('./data_trajectory_simple/')
     plot_many_trial_predictions(directory)
 
 # A list of files to open, process, and plot - for comparing predicted with actual distances

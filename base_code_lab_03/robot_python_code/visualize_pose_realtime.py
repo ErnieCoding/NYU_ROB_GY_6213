@@ -199,9 +199,10 @@ def make_3d_plot(tile_w, tile_h, rvec=None, tvec=None):
 def main():
     # Hardcode your init pose here (meters / radians output from ArUco)
     ##THIS CHANGES EVERY TIME YOY CHANGE POSITION OF CAMERA, SO UPDATE BEFORE RUNNING EACH TIME
-    tvec_init = [-0.38739399,  0.04475379 , 0.96047396]
-    rvec_init = [2.46267966, -0.03492479 , 0.32852154]
+    tvec_init = [-0.21500975, 0.56345664, 0.87650994]
+    rvec_init = [2.72888006, 0.45845892, 0.90720317]
 
+    # Raw tvec: [-0.21500975  0.56345664  0.87650994], Raw rvec: [2.72888006 0.45845892 0.90720317]
 
     tile_w = 520
     tile_h = 420
