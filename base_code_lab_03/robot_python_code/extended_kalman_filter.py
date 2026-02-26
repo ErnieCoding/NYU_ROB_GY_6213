@@ -24,8 +24,10 @@ class ExtendedKalmanFilter:
     # Call the prediction and correction steps
     def update(self, u_t, z_t, delta_t):
         if self.only_prediction or z_t is None:
+            print("ONLY PREDICTION STEP\n")
             self.state_covariance, self.state_mean = self.prediction_step(u_t, delta_t)
         else:
+            print("BOTH STEP\n")
             self.predicted_state_covariance, self.predicted_state_mean = self.prediction_step(u_t, delta_t)
             self.correction_step(z_t)
 
@@ -156,7 +158,6 @@ class KalmanFilterPlot:
         self.fig.canvas.draw_idle()
         self.fig.canvas.flush_events()
         plt.pause(0.001)
-
     
 def transform_camera_to_world(tvec, rvec):
     # Ensure inputs are float32 numpy arrays
@@ -164,8 +165,8 @@ def transform_camera_to_world(tvec, rvec):
     # tvec_init = [-0.21500975, 0.56345664, 0.87650994]
     # rvec_init = [2.72888006, 0.45845892, 0.90720317]
 
-    tvec_init = [-0.67576575, 0.00785346, 1.24334631]
-    rvec_init = [2.20569764, -0.18843277, 0.39146101]
+    tvec_init = [-0.49274365, 0.05354998, 1.29572172]
+    rvec_init = [ 2.17807045, -0.29410592, 0.29292633]
 
     tvec = np.array(tvec, dtype=np.float32)
     rvec = np.array(rvec, dtype=np.float32)
@@ -199,7 +200,7 @@ def transform_camera_to_world(tvec, rvec):
 def offline_efk(only_prediction = False):
 
     # Get data to filter
-    filename = './data_trajectory_complex/robot_data_0_0_24_02_26_16_19_18.pkl'
+    filename = './data_in-out_frame/robot_data_0_0_24_02_26_23_06_34.pkl'
     ekf_data = data_handling.get_file_data_for_kf(filename)
 
     # Instantiate PF with no initial guess
@@ -208,10 +209,7 @@ def offline_efk(only_prediction = False):
     tvec = [ekf_data[row_num][3][0], ekf_data[row_num][3][1], ekf_data[row_num][3][2]]
     rvec = [ekf_data[row_num][3][3], ekf_data[row_num][3][4], ekf_data[row_num][3][5]]
     x_0 = np.array(transform_camera_to_world(tvec, rvec))
-    print(len(ekf_data))
-    # print(f"X_tm1[0]: {ekf_data[0][3][0]}\n")
-    # print(f"X_tm1[1]: {ekf_data[0][3][1]}\n")
-    # print(f"X_tm1[5]: {ekf_data[0][3][5]}\n")
+
 
     Sigma_0 = np.array([[1,0,0], [0,1,0], [0,0,1]])
     encoder_counts_0 = ekf_data[row_num][2].encoder_counts
@@ -220,6 +218,12 @@ def offline_efk(only_prediction = False):
     # Create plotting tool for ekf
     kalman_filter_plot = KalmanFilterPlot()
 
+    #for keeping track if the camera measurement is stale (i.e. out-of-frame)
+    last_pose = None
+    stale = 0
+    STALE_N = 10        # after 10 repeated frames => out-of-frame
+    EPS = 1e-9         # small threshold
+    last_encoder_counts = 0
     # Loop over sim data
     for t in range(1, len(ekf_data)):
         row = ekf_data[t] # Current row of data
@@ -229,20 +233,44 @@ def offline_efk(only_prediction = False):
         z_t = np.array([row[3][0],row[3][1],row[3][2],row[3][3],row[3][4],row[3][5]])
         tvec = row[3][0:3]
         rvec = row[3][3:6]
-        if tvec == [0, 0, 0] or rvec == [0, 0, 0]:
+        print(f"tvec: {tvec}\nrvec: {rvec}\n")
+
+        pose = np.hstack([tvec, rvec])
+
+        # Check if the camera is stuck on the exact same frame
+        # If the robot is moving (u_t[0] is changing), the pose SHOULD change.
+        # If it doesn't change at all, it's stale.
+        is_stale = False
+        if last_pose is not None:
+            if np.array_equal(pose, last_pose): # Perfect match usually means frozen buffer
+                stale += 1
+            else:
+                stale = 0 # Reset immediately if even one bit changes
+        
+        if stale >= STALE_N:
+            is_stale = True
+
+        last_pose = pose.copy()
+
+        encoder_change = abs(u_t[0] - last_encoder_counts)
+        last_encoder_counts = u_t[0]
+
+        # Reject if the data is frozen AND we know the robot is actually moving
+        if is_stale and encoder_change > 0:
+            print(f"DEBUG: Prediction Only - Camera Stale (Frozen at {stale} frames)")
             z_t = None
+
+        # Otherwise, the data is likely valid (either moving and changing, or stopped and same)
         else:
             z_t = np.array(transform_camera_to_world(tvec, rvec))
 
-        print(f"Time: {row[0]}, u_t: {u_t}, z_t: {z_t}, delta_t: {delta_t}")
+
+        # print(f"Time: {row[0]}, u_t: {u_t}, z_t: {z_t}, delta_t: {delta_t}")
         # Run the EKF for a time step
         extended_kalman_filter.update(u_t, z_t, delta_t)
     
         kalman_filter_plot.update(extended_kalman_filter.state_mean, extended_kalman_filter.state_covariance[0:2,0:2],t)
-    print(f"State Mean: \n{extended_kalman_filter.state_mean}\n")
-    print(f"State Covariance: \n{extended_kalman_filter.state_covariance}\n")
-    print(f"State Predicted Mean: \n{extended_kalman_filter.predicted_state_mean}\n")
-    print(f"State Predicted Covariance: \n{extended_kalman_filter.predicted_state_covariance}\n")
+    
 
 ####### MAIN #######
 if __name__ == "__main__":
