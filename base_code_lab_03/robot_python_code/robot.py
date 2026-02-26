@@ -30,6 +30,9 @@ class Robot:
         self.robot_sensor_signal = robot_python_code.RobotSensorSignal([0, 0, 0])
         self.camera_sensor_signal = [0,0,0,0,0,0]
         self.extended_kalman_filter = extended_kalman_filter.ExtendedKalmanFilter(x_0 = [0,0,0], Sigma_0 = parameters.I3, encoder_counts_0 = 0)
+        self.last_pose= None
+        self.stale = 0
+        self.last_encoder_counts = 0
         
     # Create udp senders and receiver instances with the udp communication
     def setup_udp_connection(self, udp_communication):
@@ -83,9 +86,36 @@ class Robot:
     def update_state_estimate(self):
         tvec = [self.camera_sensor_signal[0], self.camera_sensor_signal[1], self.camera_sensor_signal[2]]
         rvec = [self.camera_sensor_signal[3], self.camera_sensor_signal[4], self.camera_sensor_signal[5]]
-
         u_t = np.array([self.robot_sensor_signal.encoder_counts, self.robot_sensor_signal.steering]) # robot_sensor_signal
-        z_t = np.array(self.transform_camera_to_world(tvec, rvec)) # camera_sensor_signal
+        # z_t = np.array(self.transform_camera_to_world(tvec, rvec)) # camera_sensor_signal
+
+        ##TESTING:::ONLY PREDICTION IF ROBOT IS OUTSIDE THE CAMERA FRAME, OTHERWISE UPDATE WITH CAMERA
+        pose = np.hstack([tvec, rvec])
+
+        # 2. Check if the camera is stuck on the exact same frame
+        # If the robot is moving (u_t[0] is changing), the pose SHOULD change.
+        # If it doesn't change at all, it's stale.
+        is_stale = False
+        if self.last_pose is not None:
+            if np.array_equal(pose, self.last_pose): # Perfect match usually means frozen buffer
+                self.stale += 1
+            else:
+                self.stale = 0 # Reset immediately if even one bit changes
+        
+        if self.stale >= 10:
+            is_stale = True
+
+        self.last_pose = pose.copy()
+
+        encoder_change = abs(u_t[0] - self.last_encoder_counts)
+        self.last_encoder_counts = u_t[0]
+        # 3. Final decision
+        if is_stale and encoder_change > 0:
+            z_t = None
+        else:
+            z_t = np.array(self.transform_camera_to_world(tvec, rvec))
+
+    
         delta_t = 0.1
         self.extended_kalman_filter.update(u_t, z_t, delta_t)
 
