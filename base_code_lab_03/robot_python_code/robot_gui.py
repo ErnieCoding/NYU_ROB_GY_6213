@@ -200,9 +200,9 @@ def main():
             plt.plot(x_est, y_est, 'ro')
 
             plt.grid(True)
-            plot_range = 5
-            plt.xlim(-plot_range, plot_range)
-            plt.ylim(-plot_range, plot_range)
+            plot_range = 2
+            plt.xlim(-0.5, plot_range)
+            plt.ylim(-0.5, plot_range)
 
     # Run an experiment trial from a button push
     def run_trial():

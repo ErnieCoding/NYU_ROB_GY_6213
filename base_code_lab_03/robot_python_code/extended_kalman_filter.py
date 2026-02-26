@@ -110,7 +110,7 @@ class ExtendedKalmanFilter:
     
     # This function returns the R_t matrix which contains transition function covariance terms.
     def get_R(self, s):
-        var_s = 0.000000585994 * (s/0.03063)
+        var_s = 0.000000585994 * (s/0.0003063)
 
         var_w = 0.0009
 
@@ -164,8 +164,8 @@ def transform_camera_to_world(tvec, rvec):
     # tvec_init = [-0.21500975, 0.56345664, 0.87650994]
     # rvec_init = [2.72888006, 0.45845892, 0.90720317]
 
-    tvec_init = [-0.49274365, 0.05354998, 1.29572172]
-    rvec_init = [ 2.17807045, -0.29410592, 0.29292633]
+    tvec_init = [-0.67576575, 0.00785346, 1.24334631]
+    rvec_init = [2.20569764, -0.18843277, 0.39146101]
 
     tvec = np.array(tvec, dtype=np.float32)
     rvec = np.array(rvec, dtype=np.float32)
