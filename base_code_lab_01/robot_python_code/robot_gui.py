@@ -187,7 +187,7 @@ def main():
             with ui.card().classes('w-full items-center'):
                 ui.label('STEER:').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
-                slider_steering = ui.slider(min=-20, max=20, value=0)
+                slider_steering = ui.slider(min=-50, max=50, value=0)
             with ui.card().classes('w-full items-center'):
                 ui.label().bind_text_from(slider_steering, 'value').style('text-align: center;')
             with ui.card().classes('w-full items-center'):
@@ -207,5 +207,5 @@ def main():
     ui.timer(0.1, control_loop)
 
 # Run the gui
-ui.run(native=True)
+ui.run(native=False)
 

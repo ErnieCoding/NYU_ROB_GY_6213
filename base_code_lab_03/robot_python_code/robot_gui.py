@@ -16,6 +16,9 @@ from robot import Robot
 import robot_python_code
 import parameters
 
+matplotlib.use('Agg')
+
+
 # Global variables
 logging = False
 stream_video = True
@@ -31,9 +34,9 @@ def convert(frame: np.ndarray) -> bytes:
     return imencode_image.tobytes()
     
 # Create the connection with a real camera.
-def connect_with_camera():
-    video_capture = cv2.VideoCapture(1)
-    return video_capture
+# def connect_with_camera():
+#     video_capture = cv2.VideoCapture(0)
+#     return video_capture
     
 def update_video(video_image):
     if stream_video:
@@ -45,6 +48,7 @@ def get_time_in_ms():
 # Create the gui page
 @ui.page('/')
 def main():
+    global stream_video
 
     # Robot variables
     robot = Robot()
@@ -67,18 +71,21 @@ def main():
     
     # Set up the video stream, not needed for lab 1
     if stream_video:
-        video_capture = cv2.VideoCapture(parameters.camera_id)
-    
+        video_capture = robot.camera_sensor.cap     
     # Enable frame grabs from the video stream.
     @app.get('/video/frame')
     async def grab_video_frame() -> Response:
         if not video_capture.isOpened():
-            return placeholder
+            return None
+        # if video_capture.isOpened():
+            # print("Video Capture Open!")
+            # print(f"Video Capture Object: {video_capture}")
+
         # The `video_capture.read` call is a blocking function.
         # So we run it in a separate thread (default executor) to avoid blocking the event loop.
         _, frame = await run.io_bound(video_capture.read)
         if frame is None:
-            return placeholder
+            return None
         # `convert` is a CPU-intensive function, so we run it in a separate process to avoid blocking the event loop and GIL.
         jpeg = await run.cpu_bound(convert, frame)
         return Response(content=jpeg, media_type='image/jpeg')
@@ -178,23 +185,24 @@ def main():
             plt.style.use('dark_background')
             plt.tick_params(axis='x', colors='lightgray')
             plt.tick_params(axis='y', colors='lightgray')
-            
             sigma = 3
             covar_matrix = parameters.covariance_plot_scale * robot.extended_kalman_filter.state_covariance[0:2,0:2]#np.array([[sigma, -sigma*0.9],[ -sigma*0.9, sigma]])
             x_est = robot.extended_kalman_filter.state_mean[0]
             y_est = robot.extended_kalman_filter.state_mean[1]
+            print("x_est",x_est)
+            print("y:",y_est)
+            print
             lambda_, v = np.linalg.eig(covar_matrix)
             lambda_ = np.sqrt(lambda_)
             ell = Ellipse(xy=(x_est, y_est), alpha=0.5, facecolor='red',width=lambda_[0], height=lambda_[1], angle=np.rad2deg(np.arctan2(*v[:,0][::-1])))
             ax = fig.gca()
             ax.add_artist(ell)
-
             plt.plot(x_est, y_est, 'ro')
 
             plt.grid(True)
-            plot_range = 1
-            plt.xlim(-plot_range, plot_range)
-            plt.ylim(-plot_range, plot_range)
+            plot_range = 2
+            plt.xlim(-0.5, plot_range)
+            plt.ylim(-0.5, plot_range)
 
     # Run an experiment trial from a button push
     def run_trial():
@@ -267,5 +275,5 @@ def main():
     ui.timer(0.1, control_loop)
 
 # Run the gui
-ui.run(native=True)
+ui.run(native=False)
 
