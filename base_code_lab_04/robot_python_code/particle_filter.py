@@ -39,7 +39,7 @@ class State:
         return copy.deepcopy(self)
         
     # Print the state
-    def print(self):
+    def __repr__(self):
         print("State: ",self.x, self.y, self.theta)
 
 
