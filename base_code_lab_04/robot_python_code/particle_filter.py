@@ -189,7 +189,7 @@ class Particle:
         weight_sum = 0
         for ray in lidar_signal:
             distance_m = ray.distances / 1000
-            ray_theta = self.state.theta + math.radians(ray.angles)
+            ray_theta = angle_wrap(self.state.theta + math.radians(ray.angles))
             ray_state = State(self.state.x, self.state.y, ray_theta)
             predicted_m = map.closest_distance_to_walls(ray_state)
             
@@ -244,15 +244,40 @@ class ParticleSet:
     # Function to resample the particles set, i.e. make a new one with more copies of particles with higher weights.  
     def resample(self, max_weight):
         ################## Add student code here ###################
-        self.particle_list = self.particle_list
+        indicies = range(len(self.particle_list))
+
+        weights = []
+        for particle in self.particle_list:
+            weights.append(particle.weight)
+        
+        new_indicies = np.random.choice(
+            a = indicies,
+            size=len(indicies),
+            replace=True,
+            p = weights
+        )
+
+        new_particle_list = []
+        for i in range(len(new_indicies)):
+            new_particle_list.append(self.particle_list[new_indicies[i]].deepcopy())
+        
+        self.particle_list = new_particle_list
+            
             
     # Calculate the mean state. 
     def update_mean_state(self):
         ################## Add student code here ###################
         ## Be careful how you calculate the mean theta
-        self.mean_state.x = 0
-        self.mean_state.y = 0
-        self.mean_state.theta = 0
+        sum_x, sum_y, sum_theta = 0
+
+        for particle in self.particle_list:
+            sum_x += particle.state.x
+            sum_y += particle.state.y
+            sum_theta += particle.state.theta
+        
+        self.mean_state.x = sum_x/len(self.particle_list)
+        self.mean_state.y = sum_y/len(self.particle_list)
+        self.mean_state.theta = angle_wrap(sum_theta/len(self.particle_list))
         
     # Print the particle set. Useful for debugging.
     def print_particles(self):
