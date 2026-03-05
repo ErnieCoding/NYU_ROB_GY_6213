@@ -8,6 +8,7 @@ import random
 # Local libraries
 import parameters
 import data_handling
+import motion_models
 
 # Helper function to make sure all angles are between -pi and pi
 def angle_wrap(angle):
@@ -99,14 +100,37 @@ class Map:
         
     # Function to get distance to a wall from a state, in the direction of the state's theta angle.
     # Or return the distance currently believed to be the closest if its closer.
-    def get_distance_to_wall(self, state, wall, closest_distance):
+    def get_distance_to_wall(self, state, wall: Wall, closest_distance):
         ################## Add student code here ###################
         # Use geometry to calculate the distance from the robot to the wall, for a particular direction state.theta
         # If the direction isn't pointed towards the wall, return closest_distance.
         # Suggestion: Thoroughly test your code with unit tests before using
         
-        return 0
-
+        x1, y1 = wall.corner1.x, wall.corner1.y
+        x2, y2 = wall.corner2.x, wall.corner2.y
+        
+        vx = math.cos(state.theta)
+        vy = math.sin(state.theta)
+        
+        wx = x2 - x1
+        wy = y2 - y1
+        
+        D = vx * wy - vy * wx
+        
+        if abs(D) < 1e-6:
+            return closest_distance
+            
+        dx = x1 - state.x
+        dy = y1 - state.y
+        
+        t = (dx * wy - dy * wx) / D
+        u = (dx * vy - dy * vx) / D
+        
+        if t >= 0 and 0 <= u <= 1:
+            if t < closest_distance:
+                return t
+                
+        return closest_distance
 
 # Class to hold a particle
 class Particle:
@@ -116,30 +140,66 @@ class Particle:
         self.weight = 1
         
     # Function to create a new random particle state within a range
-    def randomize_uniformly(self, xy_range):
-        ################## Add student code here ###################
-        self.state = State(0, 0, 0)
-        self.weight = 1
+    def randomize_uniformly(self, xy_range:list):
+        """
+        Create a new random particle state within a range
+
+        Arguments:
+            xy_range: range in the form of [max_x, max_y]
+        """
+
+        new_xy = np.random.uniform(high=[xy_range[0], xy_range[1]])
+        new_theta = np.random.uniform(low=-math.pi, high=math.pi)
+
+        self.state = State(new_xy[0], new_xy[1], new_theta)
 
     # Function to create a new random particle state with a normal distribution
     def randomize_around_initial_state(self, initial_state, state_stdev):
-        ################## Add student code here ###################
-        self.state = State(0, 0, 0)
-        self.weight = 1
+        new_state = np.random.normal(initial_state, state_stdev)
+        self.state = State(new_state[0], new_state[1], new_state[2])
         
     # Function to take a particle and "randomly" propagate it forward according to a motion model.
-    def propagate_state(self, last_state, delta_encoder_counts, steering, delta_t):
+    def propagate_state(self, last_state:State, delta_encoder_counts, steering, delta_t):
         ################## Add student code here ###################
-        x = 0
-        y = 0
-        theta = 0
-        self.state = State(x, y, theta)
+        s_mean = motion_models.distance_travelled_s(delta_encoder_counts)  # meters
+        w_mean = motion_models.rotational_velocity_w(steering)  # rad/s
+
+        # 3) Variances
+        var_s = motion_models.variance_distance_travelled_s(abs(s_mean))
+        var_w = motion_models.variance_rotational_velocity_w(abs(s_mean))  # input ignored if constant
+
+        # Safety clamp
+        var_s = max(0.0, var_s)
+        var_w = max(0.0, var_w)
+
+        # 4) Sample noisy controls
+        s_noisy = s_mean + random.gauss(0.0, math.sqrt(var_s))
+        w_noisy = w_mean + random.gauss(0.0, math.sqrt(var_w))
+
+
+        x_new = last_state.x + s_noisy * math.cos(last_state.theta)
+        y_new = last_state.y + s_noisy * math.sin(last_state.theta)
+        theta_new = last_state.theta + w_noisy * delta_t
+
+        self.state = State(x_new, y_new, theta_new)
         
     # Function to determine a particles weight based how well the lidar measurement matches up with the map.
-    def calculate_weight(self, lidar_signal, map):
-        ################## Add student code here ###################
-        self.weight = 0
+    def calculate_weight(self, lidar_signal, map:Map):
+        # TODO: Verify weights after implementing the filter
+        weight_sum = 0
+        for ray in lidar_signal:
+            distance_m = ray.distances / 1000
+            ray_theta = self.state.theta + math.radians(ray.angles)
+            ray_state = State(self.state.x, self.state.y, ray_theta)
+            predicted_m = map.closest_distance_to_walls(ray_state)
+            
+            weight_sum += self.gaussian(predicted_m, distance_m)
         
+        self.weight = weight_sum/len(lidar_signal)
+
+            
+
+
     # Return the normal distribution function output.
     def gaussian(self, expected_distance, distance):
         return math.exp(-math.pow(expected_distance - distance, 2)/ 2 / parameters.distance_variance)
@@ -149,7 +209,7 @@ class Particle:
         return copy.deepcopy(self)
         
     # Print the particle
-    def print(self):
+    def __repr__(self):
         print("Particle: ", self.state.x, self.state.y, self.state.theta, " w: ", self.weight)
 
 
