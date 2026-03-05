@@ -7,3 +7,6 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# other
+.DS_Store
