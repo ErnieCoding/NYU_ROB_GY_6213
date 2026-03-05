@@ -20,6 +20,8 @@ import parameters
 logging = False
 stream_video = False
 
+matplotlib.use('Agg')
+
 
 # Frame converter for the video stream, from OpenCV to a JPEG image
 def convert(frame: np.ndarray) -> bytes:
@@ -67,7 +69,8 @@ def main():
     
     # Set up the video stream, not needed for lab 1
     if stream_video:
-        video_capture = cv2.VideoCapture(parameters.camera_id)
+        # video_capture = cv2.VideoCapture(parameters.camera_id)
+        video_capture = robot.camera_sensor.cap
     
     # Enable frame grabs from the video stream.
     @app.get('/video/frame')
@@ -88,7 +91,8 @@ def main():
         for i in range(robot.robot_sensor_signal.num_lidar_rays):
             distance_in_mm = robot.robot_sensor_signal.distances[i]
             angle = 360-robot.robot_sensor_signal.angles[i]
-            if distance_in_mm > 20 and abs(angle) < 360:
+            print(f"DISTANCE: {distance_in_mm}\tANGLE:{angle}\n")
+            if distance_in_mm > 0 and abs(angle) < 360:
                 index = max(0,min(int(360/lidar_angle_res-1),int((angle-(lidar_angle_res/2))/lidar_angle_res)))
                 lidar_distance_list[index] = distance_in_mm/1000
                
@@ -256,5 +260,5 @@ def main():
     ui.timer(0.1, control_loop)
 
 # Run the gui
-ui.run(native=True)
+ui.run(native=False)
 

@@ -11,11 +11,11 @@ bufferSize = 1024
 
 # Camera parameters
 camera_id = 0
-marker_length = 0.071
-camera_matrix = np.array([[1.41089024e+03, 0.00000000e+00 ,5.34757040e+02],
- [0.00000000e+00 ,1.40977771e+03, 4.63300611e+02],
- [0.00000000e+00 ,0.00000000e+00 ,1.00000000e+00]], dtype=np.float32)
-dist_coeffs = np.array([-0.32511173, -0.09273864 ,-0.00295959 , 0.00111094 , 0.2446519 ], dtype=np.float32)
+marker_length = 0.067
+camera_matrix = np.array([[1.03843829e+03, 0.00000000e+00, 5.70058553e+02],
+  [0.00000000e+00, 1.06325837e+03, 3.09600558e+02],
+  [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]], dtype=np.float32)
+dist_coeffs = np.array([-0.41925883,  0.32857265,  0.00174434, -0.00148671, -0.21424311], dtype=np.float32)
 
 # Robot parameters
 num_robot_sensors = 2 # encoder, steering
@@ -37,12 +37,8 @@ covariance_plot_scale = 100
 # PF parameters, modify the map and num particles as you see fit.
 num_particles = 100
 wall_corner_list = [
-    [0, 0, 2.74, 0], 
-    [0, 0, 0, 3.78], 
-    [0, 3.78, 1.92, 3.78],
-    [1.03, 1.61, 1.03, 2.19],
-    [1.03, 2.19, 1.41, 2.19],
-    [1.92, 3.78, 1.92, 3.32],
-    [1.92, 3.32, 2.74, 3.32],
-    [2.74, 3.32, 2.74, 0]
+    [0, 0, 390/100, 0], 
+    [390/100, 0, 390/100, 200/100], 
+    [390/100, 200/100,0, 200/100],
+    [ 0, 200/100,0, 0],
     ]

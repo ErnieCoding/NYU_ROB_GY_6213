@@ -198,7 +198,8 @@ class CameraSensor:
     # Constructor
     def __init__(self, camera_id):
         self.camera_id = camera_id
-        self.cap = cv2.VideoCapture(camera_id)
+        # self.cap = cv2.VideoCapture(camera_id) # WINDOWS
+        self.cap = cv2.VideoCapture(camera_id, cv2.CAP_V4L2) # LINUX
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
         self.parameters = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.parameters)

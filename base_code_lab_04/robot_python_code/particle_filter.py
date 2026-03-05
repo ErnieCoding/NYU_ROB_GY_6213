@@ -300,7 +300,7 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data/robot_data_0_0_25_02_26_21_41_33.pkl'
+    filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
@@ -315,9 +315,13 @@ def offline_pf():
         delta_t = pf_data[t][0] - pf_data[t-1][0] # time step size
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = row[2] # lidar_sensor_signal
-
+        # print(f"ANGLES:\n{z_t.angles}\n\nDISTANCE(mm):\n{z_t.distances}\n\n")
         # Run the PF for a time step
-        particle_filter.update(u_t, z_t, delta_t)
+        # target_angle = 0
+        # if target_angle in z_t.angles:
+        #     print(f"ANGLE {target_angle} DISTANCE {z_t.distances[z_t.angles.index(target_angle)]}")
+
+        # particle_filter.update(u_t, z_t, delta_t)
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
 
     particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
