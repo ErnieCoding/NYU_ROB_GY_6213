@@ -35,10 +35,11 @@ I3 = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]])
 covariance_plot_scale = 100
 
 # PF parameters, modify the map and num particles as you see fit.
-num_particles = 100
+num_particles = 10
 wall_corner_list = [
     [0, 0, 390/100, 0], 
     [390/100, 0, 390/100, 200/100], 
     [390/100, 200/100,0, 200/100],
     [ 0, 200/100,0, 0],
 ]
+distance_variance = 0.000210764044943819
