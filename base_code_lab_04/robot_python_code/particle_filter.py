@@ -117,6 +117,7 @@ class Map:
         
         D = vx * wy - vy * wx
         
+        # print(f"\nINTERSECTION DENOMINATOR: {D}\n")
         if abs(D) < 1e-6:
             return closest_distance
             
@@ -126,6 +127,8 @@ class Map:
         t = (dx * wy - dy * wx) / D
         u = (dx * vy - dy * vx) / D
         
+        # print(f"DISTANCE t: {t}\n")
+        # print(f"HIT OR NOT u: {u}\n")
         if t >= 0 and 0 <= u <= 1:
             if t < closest_distance:
                 return t
@@ -145,10 +148,11 @@ class Particle:
         Create a new random particle state within a range
 
         Arguments:
-            xy_range: range in the form of [max_x, max_y]
+            xy_range: range in the form of [min_x, max_x, min_y, max_y]
         """
 
-        new_xy = np.random.uniform(high=[xy_range[0], xy_range[1]])
+        new_xy = np.random.uniform(low=[xy_range[0], xy_range[2]], high=[xy_range[1], xy_range[3]])
+        print(f"\n\nRANDOMIZE UNIFORMLY XY: {new_xy}\n\n")
         new_theta = np.random.uniform(low=-math.pi, high=math.pi)
 
         self.state = State(new_xy[0], new_xy[1], new_theta)
@@ -158,7 +162,8 @@ class Particle:
         init_state_array = [initial_state.x, initial_state.y, initial_state.theta]
         std_dev_array = [state_stdev.x, state_stdev.y, state_stdev.theta]
         new_state = np.random.normal(init_state_array, std_dev_array)
-        self.state = State(new_state[0], new_state[1], new_state[2])
+        print(f"\n\nNEW STATE FROM RANDOMIZATION: {new_state}\n\n")
+        self.state = State(new_state[0], new_state[1], angle_wrap(new_state[2]))
         
     # Function to take a particle and "randomly" propagate it forward according to a motion model.
     def propagate_state(self, last_state:State, delta_encoder_counts, steering, delta_t):
@@ -199,7 +204,7 @@ class Particle:
             ray_state = State(self.state.x, self.state.y, ray_theta)
             predicted_m = map.closest_distance_to_walls(ray_state)
             #print error squared
-            print(f"Predicted distance: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
+            # print(f"Predicted distance: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
             
             weight_sum += self.gaussian(predicted_m, distance_m)
         
@@ -258,10 +263,10 @@ class ParticleSet:
         for particle in self.particle_list:
             repr(particle)
             weights.append(particle.weight)
-        print(f"WEIGHTS:\n{weights}\n\n")
+        # print(f"WEIGHTS:\n{weights}\n\n")
 
         normalized_weights = weights / np.sum(weights)
-        print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
+        # print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
         new_indicies = np.random.choice(
             a = indicies,
             size=len(indicies),
@@ -311,10 +316,10 @@ class ParticleFilter:
 
     # Update the states given new measurements
     def update(self, odometery_signal, measurement_signal, delta_t):
-        print("------------------PREDICTION STEP------------------\n\n")
+        # print("------------------PREDICTION STEP------------------\n\n")
         self.prediction(odometery_signal, delta_t)
         if len(measurement_signal.angles)>0:
-            print("------------------CORRECTION STEP------------------\n\n")
+            # print("------------------CORRECTION STEP------------------\n\n")
             self.correction(measurement_signal)
         self.particle_set.update_mean_state()
         self.state_estimate_list.append(self.state_estimate.deepcopy())
@@ -416,11 +421,11 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_map_trajectory/robot_data_80_-6_04_03_26_20_31_13.pkl'
+    filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
-    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(0.5, 2.0, 1.57), state_stdev = State(0.1,0.1,0.1), known_start_state=True, encoder_counts_0=pf_data[0][2].encoder_counts)
+    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.5, 0), state_stdev = State(0.1,0.1,0.1), known_start_state=True, encoder_counts_0=pf_data[0][2].encoder_counts)
 
     # Create plotting tool for particles
     particle_filter_plot = ParticleFilterPlot(map)
