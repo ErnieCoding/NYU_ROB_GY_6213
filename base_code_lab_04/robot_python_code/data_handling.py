@@ -106,6 +106,15 @@ def plot_trial_basics(filename):
 def run_my_model_on_trial(filename, show_plot = True, plot_color = 'ko'):
     time_list, encoder_count_list, velocity_list, steering_angle_list, x_camera_list, y_camera_list, z_camera_list, yaw_camera_list = get_file_data(filename)
     
+    #use get_file_data_for_pf to get the data
+    time_list, control_signal_list, robot_sensor_signal_list = get_file_data_for_pf(filename)
+    #decompose control signal list and robot sensor signal list into the components you need for the motion model
+    encoder_count_list = []
+    steering_angle_list = []
+    for row in control_signal_list:
+        encoder_count_list.append(row.encoder_counts)
+        steering_angle_list.append(row.steering_angle)
+        
     motion_model = motion_models.MyMotionModel([0,0,0], 0)
     x_list, y_list, theta_list = motion_model.traj_propagation(time_list, encoder_count_list, steering_angle_list)
 

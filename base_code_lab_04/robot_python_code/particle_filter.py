@@ -117,7 +117,7 @@ class Map:
         
         D = vx * wy - vy * wx
         
-        # print(f"\nINTERSECTION DENOMINATOR: {D}\n")
+        # print(f"\nINTERSECTION DENOMINATOR: {abs(D)}\n")
         if abs(D) < 1e-6:
             return closest_distance
             
@@ -152,7 +152,7 @@ class Particle:
         """
 
         new_xy = np.random.uniform(low=[xy_range[0], xy_range[2]], high=[xy_range[1], xy_range[3]])
-        print(f"\n\nRANDOMIZE UNIFORMLY XY: {new_xy}\n\n")
+        # print(f"\n\nRANDOMIZE UNIFORMLY XY: {new_xy}\n\n")
         new_theta = np.random.uniform(low=-math.pi, high=math.pi)
 
         self.state = State(new_xy[0], new_xy[1], new_theta)
@@ -162,12 +162,16 @@ class Particle:
         init_state_array = [initial_state.x, initial_state.y, initial_state.theta]
         std_dev_array = [state_stdev.x, state_stdev.y, state_stdev.theta]
         new_state = np.random.normal(init_state_array, std_dev_array)
-        print(f"\n\nNEW STATE FROM RANDOMIZATION: {new_state}\n\n")
+        # print(f"\n\nNEW STATE FROM RANDOMIZATION: {new_state}\n\n")
         self.state = State(new_state[0], new_state[1], angle_wrap(new_state[2]))
         
     # Function to take a particle and "randomly" propagate it forward according to a motion model.
     def propagate_state(self, last_state:State, delta_encoder_counts, steering, delta_t):
         ################## Add student code here ###################
+        
+        #print encoder counts, steering
+        print(f"\n\nENCODER COUNTS: {delta_encoder_counts}, STEERING: {steering}")
+        
         s_mean = motion_models.distance_travelled_s(delta_encoder_counts)  # meters
         w_mean = motion_models.rotational_velocity_w(steering)  # rad/s
 
@@ -186,13 +190,24 @@ class Particle:
 
         x_new = last_state.x + s_noisy * math.cos(last_state.theta)
         y_new = last_state.y + s_noisy * math.sin(last_state.theta)
-        theta_new = last_state.theta + w_noisy * delta_t
-
+        theta_new = angle_wrap(last_state.theta + w_noisy * delta_t)
+        
+        ##print x,y,theta in the same line 
+        print(f"Propagated state: {x_new}, {y_new}, {theta_new}\n")
+        
         self.state = State(x_new, y_new, theta_new)
         
     # Function to determine a particles weight based how well the lidar measurement matches up with the map.
     def calculate_weight(self, lidar_signal, map:Map):
         # TODO: Verify weights after implementing the filter
+        
+        # Quick boundary check: is this particle completely off the map?
+        if (self.state.x < map.plot_range[0] or self.state.x > map.plot_range[1] or
+            self.state.y < map.plot_range[2] or self.state.y > map.plot_range[3]):
+            
+            self.weight = 1e-9 # Kill it instantly
+            return
+        
         weight_sum = 0
         for i in range(len(lidar_signal.distances)):
             ray_distance = lidar_signal.distances[i]
@@ -261,12 +276,14 @@ class ParticleSet:
 
         weights = []
         for particle in self.particle_list:
-            repr(particle)
+            # print(particle)
             weights.append(particle.weight)
         # print(f"WEIGHTS:\n{weights}\n\n")
 
         normalized_weights = weights / np.sum(weights)
         # print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
+        # print(f"Sum of normalized weights: {np.sum(normalized_weights)}\n\n")
+
         new_indicies = np.random.choice(
             a = indicies,
             size=len(indicies),
@@ -339,6 +356,7 @@ class ParticleFilter:
             curr_particle = curr_particle_list[i]
             curr_particle.propagate_state(curr_particle.state, encoder_count - self.last_encoder_counts, steering, delta_t)
 
+    
         self.last_encoder_counts = encoder_count
         
     # Corrrect the predicted states.
@@ -398,6 +416,8 @@ class ParticleFilterPlot:
         plt.ylabel('Y(m)')
         plt.axis(self.map.plot_range)
         plt.grid()
+        plt.xlim(-5, 10)  # Set x-axis limits from 0 to 30
+        plt.ylim(-5, 10) # Set y-axis limits from 0 to 160
         if hold_show_plot:
             plt.show()
         else:
@@ -421,30 +441,39 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
+    # filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
+    filename = './data_map_trajectory/robot_data_80_-6_04_03_26_20_31_13.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
-    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.5, 0), state_stdev = State(0.1,0.1,0.1), known_start_state=True, encoder_counts_0=pf_data[0][2].encoder_counts)
+    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.5, 0), state_stdev = State(0.1,0.1,0.1), known_start_state=False, encoder_counts_0=pf_data[0][2].encoder_counts)
 
     # Create plotting tool for particles
     particle_filter_plot = ParticleFilterPlot(map)
 
     # Loop over pf data
+    i=0
     for t in range(1, len(pf_data)):
         row = pf_data[t]
         delta_t = pf_data[t][0] - pf_data[t-1][0] # time step size
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = row[2] # lidar_sensor_signal
+
+        ##print the u_t
+        print(f"\n\nU_T: {u_t}\n\n")
         # print(f"ANGLES:\n{z_t.angles}\n\nDISTANCE(mm):\n{z_t.distances}\n\n")
         # Run the PF for a time step
         # target_angle = 0
         # if target_angle in z_t.angles:
         #     print(f"ANGLE {target_angle} DISTANCE {z_t.distances[z_t.angles.index(target_angle)]}")
 
+        
         particle_filter.update(u_t, z_t, delta_t)
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
+        if i==25:
+            break
 
+        i+=1
     particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
 
         
