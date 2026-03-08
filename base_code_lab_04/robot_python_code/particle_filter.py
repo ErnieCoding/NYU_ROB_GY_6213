@@ -191,11 +191,15 @@ class Particle:
         weight_sum = 0
         for i in range(len(lidar_signal.distances)):
             ray_distance = lidar_signal.distances[i]
+            
             ray_angle = lidar_signal.angles[i]
             distance_m = ray_distance / 1000
+            
             ray_theta = angle_wrap(self.state.theta + math.radians(ray_angle))
             ray_state = State(self.state.x, self.state.y, ray_theta)
             predicted_m = map.closest_distance_to_walls(ray_state)
+            #print error squared
+            print(f"Predicted distance: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
             
             weight_sum += self.gaussian(predicted_m, distance_m)
         
@@ -412,7 +416,7 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
+    filename = './data_map_trajectory/robot_data_80_-6_04_03_26_20_31_13.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
