@@ -141,6 +141,10 @@ class Particle:
     def __init__(self):
         self.state = State(0, 0, 0)
         self.weight = 1
+    
+
+    def generate_hardcoded_state(self,x,y,theta):
+        self.state = State(x,y,theta)
         
     # Function to create a new random particle state within a range
     def randomize_uniformly(self, xy_range:list):
@@ -216,15 +220,16 @@ class Particle:
             ray_distance = lidar_signal.distances[i]
             
             ray_angle = lidar_signal.angles[i]
+            ray_angle_converted = lidar_signal.convert_hardware_angle(ray_angle)
             distance_m = ray_distance / 1000
             
-            ray_theta = angle_wrap(self.state.theta + math.radians(ray_angle))
+            ray_theta = angle_wrap(self.state.theta + ray_angle_converted)
             ray_state = State(self.state.x, self.state.y, ray_theta)
             predicted_m = map.closest_distance_to_walls(ray_state)
             if predicted_m > max_lidar_range:
                 predicted_m = max_lidar_range
             #print error squared
-            # print(f"Predicted distance: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
+            # print(f"Predicted distance for X {self.state.x} Y {self.state.y} THETA {self.state.theta}: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
             
             weight_sum += self.gaussian(predicted_m, distance_m)
         
@@ -235,7 +240,7 @@ class Particle:
 
     # Return the normal distribution function output.
     def gaussian(self, expected_distance, distance):
-        return math.exp(-math.pow(expected_distance - distance, 2)/ 2 / parameters.distance_variance)
+        return math.exp(-math.pow(expected_distance - distance, 2)/ 2 / parameters.distance_variance) + 0.000000001
 
     # Deep copy the particle
     def deepcopy(self):
@@ -257,9 +262,18 @@ class ParticleSet:
             self.generate_initial_state_particles(initial_state, state_stdev)
         else:
             self.generate_uniform_random_particles(xy_range)
+            # self.generate_hardcoded_particles() # HARDCODED PARTICLES FOR TEST
         self.mean_state = State(0, 0, 0)
         self.update_mean_state()
-        
+    
+    def generate_hardcoded_particles(self):
+        x, y, theta = [0.5, 390/100, 195/100],[0.2, 0, 200/100],[0.785398, 0, 3.14159]
+
+        for i in range(self.num_particles):
+            hardcoded_particle = Particle()
+            hardcoded_particle.generate_hardcoded_state(x[i], y[i], theta[i])
+            self.particle_list.append(hardcoded_particle)
+
     # Function to reset particles and random locations in the workspace.
     def generate_uniform_random_particles(self, xy_range):
         for i in range(self.num_particles):
@@ -281,14 +295,14 @@ class ParticleSet:
 
         weights = []
         for particle in self.particle_list:
-            # print(particle)
+            print(particle)
             weights.append(particle.weight)
         
         # print("--Weight Calculation--\n")
         # print(f"\n\nWEIGHTS:\n{weights}")
 
         normalized_weights = weights / np.sum(weights)
-        # print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
+        print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
         # print(f"Sum of normalized weights: {np.sum(normalized_weights)}\n\n")
 
         new_indicies = np.random.choice(
@@ -309,16 +323,17 @@ class ParticleSet:
     def update_mean_state(self):
         ################## Add student code here ###################
         ## Be careful how you calculate the mean theta
-        sum_x, sum_y, sum_theta = 0, 0, 0
+        sum_x, sum_y, sum_sin_theta, sum_cos_theta = 0, 0, 0, 0
 
         for particle in self.particle_list:
             sum_x += particle.state.x
             sum_y += particle.state.y
-            sum_theta += particle.state.theta
+            sum_sin_theta += math.sin(particle.state.theta)
+            sum_cos_theta += math.cos(particle.state.theta)
         
         self.mean_state.x = sum_x/len(self.particle_list)
         self.mean_state.y = sum_y/len(self.particle_list)
-        self.mean_state.theta = angle_wrap(sum_theta/len(self.particle_list))
+        self.mean_state.theta = math.atan2(sum_sin_theta, sum_cos_theta)
         
     # Print the particle set. Useful for debugging.
     def print_particles(self):
@@ -340,9 +355,12 @@ class ParticleFilter:
 
     # Update the states given new measurements
     def update(self, odometery_signal, measurement_signal, delta_t):
+        tmp_last_encoder_count = self.last_encoder_counts
         print("------------------PREDICTION STEP------------------\n\n")
         self.prediction(odometery_signal, delta_t)
-        if len(measurement_signal.angles)>0:
+        delta_encoder_counts = odometery_signal[0] - tmp_last_encoder_count
+        print(f"DELTA ENCODER COUNTS AT UPDATE STEP: {delta_encoder_counts}")
+        if len(measurement_signal.angles)>0 and delta_encoder_counts != 0:
             print("------------------CORRECTION STEP------------------\n\n")
             self.correction(measurement_signal)
         self.particle_set.update_mean_state()
@@ -447,11 +465,11 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_new_room_simple_trajectory/robot_data_0_0_08_03_26_21_19_38.pkl'
+    filename = './data_old_room_simple_trajectory/robot_data_0_0_08_03_26_19_33_10.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
-    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(0, 0, 0.785398), state_stdev = State(1, 1, 0.1), known_start_state=True, encoder_counts_0=pf_data[0][2].encoder_counts)
+    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.8, 0.45398), state_stdev = State(1, 1, 0.1), known_start_state=False, encoder_counts_0=pf_data[0][2].encoder_counts)
 
     # Create plotting tool for particles
     particle_filter_plot = ParticleFilterPlot(map)
@@ -478,7 +496,7 @@ def offline_pf():
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
         print(f"\nCurrent Number of Particles: {len(particle_filter.particle_set.particle_list)}\n\n")
 
-        # if i >= 20:
+        # if i >= 35:
         #     break
 
 
