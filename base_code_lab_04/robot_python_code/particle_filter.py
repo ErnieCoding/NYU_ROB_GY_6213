@@ -117,7 +117,7 @@ class Map:
         
         D = vx * wy - vy * wx
         
-        # print(f"\nINTERSECTION DENOMINATOR: {abs(D)}\n")
+        # print(f"\n\nINTERSECTION DENOMINATOR: {abs(D)}")
         if abs(D) < 1e-6:
             return closest_distance
             
@@ -127,8 +127,8 @@ class Map:
         t = (dx * wy - dy * wx) / D
         u = (dx * vy - dy * vx) / D
         
-        # print(f"DISTANCE t: {t}\n")
-        # print(f"HIT OR NOT u: {u}\n")
+        # print(f"DISTANCE t: {t}")
+        # print(f"HIT OR NOT u: {u}\n\n")
         if t >= 0 and 0 <= u <= 1:
             if t < closest_distance:
                 return t
@@ -191,24 +191,27 @@ class Particle:
         x_new = last_state.x + s_noisy * math.cos(last_state.theta)
         y_new = last_state.y + s_noisy * math.sin(last_state.theta)
         theta_new = angle_wrap(last_state.theta + w_noisy * delta_t)
-        
-        ##print x,y,theta in the same line 
-        print(f"Propagated state: {x_new}, {y_new}, {theta_new}\n")
-        
-        self.state = State(x_new, y_new, theta_new)
+
+        print(f"PROPAGATED STATE: x {x_new}, y {y_new}, theta {theta_new}")
+
+        self.state.x = x_new
+        self.state.y = y_new
+        self.state.theta = theta_new
         
     # Function to determine a particles weight based how well the lidar measurement matches up with the map.
     def calculate_weight(self, lidar_signal, map:Map):
         # TODO: Verify weights after implementing the filter
         
-        # Quick boundary check: is this particle completely off the map?
-        if (self.state.x < map.plot_range[0] or self.state.x > map.plot_range[1] or
-            self.state.y < map.plot_range[2] or self.state.y > map.plot_range[3]):
+        # # Quick boundary check: is this particle completely off the map?
+        # if (self.state.x < map.plot_range[0] or self.state.x > map.plot_range[1] or
+        #     self.state.y < map.plot_range[2] or self.state.y > map.plot_range[3]):
             
-            self.weight = 1e-9 # Kill it instantly
-            return
+        #     self.weight = 1e-9 # Kill it instantly
+        #     return
         
         weight_sum = 0
+        max_lidar_range = 12.0
+
         for i in range(len(lidar_signal.distances)):
             ray_distance = lidar_signal.distances[i]
             
@@ -218,6 +221,8 @@ class Particle:
             ray_theta = angle_wrap(self.state.theta + math.radians(ray_angle))
             ray_state = State(self.state.x, self.state.y, ray_theta)
             predicted_m = map.closest_distance_to_walls(ray_state)
+            if predicted_m > max_lidar_range:
+                predicted_m = max_lidar_range
             #print error squared
             # print(f"Predicted distance: {predicted_m}, Measured distance: {distance_m}, Error: {(predicted_m - distance_m)}")
             
@@ -278,7 +283,9 @@ class ParticleSet:
         for particle in self.particle_list:
             # print(particle)
             weights.append(particle.weight)
-        # print(f"WEIGHTS:\n{weights}\n\n")
+        
+        # print("--Weight Calculation--\n")
+        # print(f"\n\nWEIGHTS:\n{weights}")
 
         normalized_weights = weights / np.sum(weights)
         # print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
@@ -288,7 +295,7 @@ class ParticleSet:
             a = indicies,
             size=len(indicies),
             replace=True,
-            p = weights / np.sum(weights)
+            p = normalized_weights
         )
 
         new_particle_list = []
@@ -333,10 +340,10 @@ class ParticleFilter:
 
     # Update the states given new measurements
     def update(self, odometery_signal, measurement_signal, delta_t):
-        # print("------------------PREDICTION STEP------------------\n\n")
+        print("------------------PREDICTION STEP------------------\n\n")
         self.prediction(odometery_signal, delta_t)
         if len(measurement_signal.angles)>0:
-            # print("------------------CORRECTION STEP------------------\n\n")
+            print("------------------CORRECTION STEP------------------\n\n")
             self.correction(measurement_signal)
         self.particle_set.update_mean_state()
         self.state_estimate_list.append(self.state_estimate.deepcopy())
@@ -372,7 +379,6 @@ class ParticleFilter:
             curr_particle.calculate_weight(measurement_signal, self.map)
 
         self.particle_set.resample(0)
-
         
     # Output to terminal the mean state.
     def print_state_estimate(self):
@@ -416,8 +422,8 @@ class ParticleFilterPlot:
         plt.ylabel('Y(m)')
         plt.axis(self.map.plot_range)
         plt.grid()
-        plt.xlim(-5, 10)  # Set x-axis limits from 0 to 30
-        plt.ylim(-5, 10) # Set y-axis limits from 0 to 160
+        # plt.xlim(-5, 10)  # Set x-axis limits from 0 to 30
+        # plt.ylim(-5, 10) # Set y-axis limits from 0 to 160
         if hold_show_plot:
             plt.show()
         else:
@@ -441,19 +447,19 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    # filename = './data_map_stationary/robot_data_0_0_04_03_26_20_26_30.pkl'
-    filename = './data_map_trajectory/robot_data_80_-6_04_03_26_20_31_13.pkl'
+    filename = './data_new_room_simple_trajectory/robot_data_0_0_08_03_26_21_19_38.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
-    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.5, 0), state_stdev = State(0.1,0.1,0.1), known_start_state=False, encoder_counts_0=pf_data[0][2].encoder_counts)
+    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(0, 0, 0.785398), state_stdev = State(1, 1, 0.1), known_start_state=True, encoder_counts_0=pf_data[0][2].encoder_counts)
 
     # Create plotting tool for particles
     particle_filter_plot = ParticleFilterPlot(map)
 
     # Loop over pf data
-    i=0
+    # i = 0
     for t in range(1, len(pf_data)):
+        # i += 1
         row = pf_data[t]
         delta_t = pf_data[t][0] - pf_data[t-1][0] # time step size
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
@@ -470,10 +476,12 @@ def offline_pf():
         
         particle_filter.update(u_t, z_t, delta_t)
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
-        if i==25:
-            break
+        print(f"\nCurrent Number of Particles: {len(particle_filter.particle_set.particle_list)}\n\n")
 
-        i+=1
+        # if i >= 20:
+        #     break
+
+
     particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
 
         
