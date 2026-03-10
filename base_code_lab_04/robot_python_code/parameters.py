@@ -35,7 +35,7 @@ I3 = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]])
 covariance_plot_scale = 100
 
 # PF parameters, modify the map and num particles as you see fit.
-num_particles = 10000
+num_particles = 1000
 
 # OLD ROOM WALLS
 # wall_corner_list = [
@@ -58,4 +58,17 @@ num_particles = 10000
 #     [0, 200/100, 0, 0]
 # ]
 
-distance_variance = 0.000210764044943819
+# PROFESSOR'S ROOM
+wall_corner_list = [
+    [0, 0, 2.74, 0], 
+    [0, 0, 0, 3.78], 
+    [0, 3.78, 1.92, 3.78],
+    [1.03, 1.61, 1.03, 2.19],
+    [1.03, 2.19, 1.41, 2.19],
+    [1.92, 3.78, 1.92, 3.32],
+    [1.92, 3.32, 2.74, 3.32],
+    [2.74, 3.32, 2.74, 0]
+]
+
+# distance_variance = 0.000210764044943819
+distance_variance = 0.0225

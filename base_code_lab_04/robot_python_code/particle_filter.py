@@ -174,7 +174,7 @@ class Particle:
         ################## Add student code here ###################
         
         #print encoder counts, steering
-        print(f"\n\nENCODER COUNTS: {delta_encoder_counts}, STEERING: {steering}")
+        # print(f"\n\nENCODER COUNTS: {delta_encoder_counts}, STEERING: {steering}")
         
         s_mean = motion_models.distance_travelled_s(delta_encoder_counts)  # meters
         w_mean = motion_models.rotational_velocity_w(steering)  # rad/s
@@ -196,7 +196,7 @@ class Particle:
         y_new = last_state.y + s_noisy * math.sin(last_state.theta)
         theta_new = angle_wrap(last_state.theta + w_noisy * delta_t)
 
-        print(f"PROPAGATED STATE: x {x_new}, y {y_new}, theta {theta_new}")
+        # print(f"PROPAGATED STATE: x {x_new}, y {y_new}, theta {theta_new}")
 
         self.state.x = x_new
         self.state.y = y_new
@@ -295,14 +295,14 @@ class ParticleSet:
 
         weights = []
         for particle in self.particle_list:
-            print(particle)
+            # print(particle)
             weights.append(particle.weight)
         
         # print("--Weight Calculation--\n")
         # print(f"\n\nWEIGHTS:\n{weights}")
 
         normalized_weights = weights / np.sum(weights)
-        print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
+        # print(f"NORMALIZED WEIGHTS:\n{normalized_weights}\n\n")
         # print(f"Sum of normalized weights: {np.sum(normalized_weights)}\n\n")
 
         new_indicies = np.random.choice(
@@ -356,12 +356,12 @@ class ParticleFilter:
     # Update the states given new measurements
     def update(self, odometery_signal, measurement_signal, delta_t):
         tmp_last_encoder_count = self.last_encoder_counts
-        print("------------------PREDICTION STEP------------------\n\n")
+        # print("------------------PREDICTION STEP------------------\n\n")
         self.prediction(odometery_signal, delta_t)
         delta_encoder_counts = odometery_signal[0] - tmp_last_encoder_count
-        print(f"DELTA ENCODER COUNTS AT UPDATE STEP: {delta_encoder_counts}")
-        if len(measurement_signal.angles)>0 and delta_encoder_counts != 0:
-            print("------------------CORRECTION STEP------------------\n\n")
+        # print(f"DELTA ENCODER COUNTS AT UPDATE STEP: {delta_encoder_counts}")
+        if len(measurement_signal.angles)>0:
+            # print("------------------CORRECTION STEP------------------\n\n")
             self.correction(measurement_signal)
         self.particle_set.update_mean_state()
         self.state_estimate_list.append(self.state_estimate.deepcopy())
@@ -465,7 +465,7 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_old_room_simple_trajectory/robot_data_0_0_08_03_26_19_33_10.pkl'
+    filename = './data_professor/robot_data_0_0_25_02_26_21_41_33.pkl'
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
@@ -484,7 +484,7 @@ def offline_pf():
         z_t = row[2] # lidar_sensor_signal
 
         ##print the u_t
-        print(f"\n\nU_T: {u_t}\n\n")
+        # print(f"\n\nU_T: {u_t}\n\n")
         # print(f"ANGLES:\n{z_t.angles}\n\nDISTANCE(mm):\n{z_t.distances}\n\n")
         # Run the PF for a time step
         # target_angle = 0
@@ -494,7 +494,7 @@ def offline_pf():
         
         particle_filter.update(u_t, z_t, delta_t)
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)
-        print(f"\nCurrent Number of Particles: {len(particle_filter.particle_set.particle_list)}\n\n")
+        # print(f"\nCurrent Number of Particles: {len(particle_filter.particle_set.particle_list)}\n\n")
 
         # if i >= 35:
         #     break
