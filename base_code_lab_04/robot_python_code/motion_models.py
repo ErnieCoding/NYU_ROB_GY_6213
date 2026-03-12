@@ -8,7 +8,7 @@ import random
 # A function for obtaining variance in distance travelled as a function of distance travelled
 def variance_distance_travelled_s(distance):
     # Add student code here
-    var_s = 0.000000585994 * (distance/0.03063)
+    var_s = 0.000000585994 * (distance/0.0003063)
     return var_s
 
 

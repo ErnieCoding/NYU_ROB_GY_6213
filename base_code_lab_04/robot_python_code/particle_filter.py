@@ -360,7 +360,7 @@ class ParticleFilter:
         self.prediction(odometery_signal, delta_t)
         delta_encoder_counts = odometery_signal[0] - tmp_last_encoder_count
         # print(f"DELTA ENCODER COUNTS AT UPDATE STEP: {delta_encoder_counts}")
-        if len(measurement_signal.angles)>0:
+        if len(measurement_signal.angles)>0 and delta_encoder_counts !=0:
             # print("------------------CORRECTION STEP------------------\n\n")
             self.correction(measurement_signal)
         self.particle_set.update_mean_state()
@@ -465,11 +465,15 @@ def offline_pf():
     map = Map(parameters.wall_corner_list)
 
     # Get data to filter
-    filename = './data_professor/robot_data_0_0_25_02_26_21_41_33.pkl'
+    # filename = './data/robot_data_0_0_10_03_26_22_35_46.pkl'#SIMPLE--going straight line from origin at 45 angle ishhh though i stopped recordign data too early
+    # filename = './data/robot_data_0_0_10_03_26_22_44_42.pkl' #SIMPLE--going straight line from origin at 45 angle ishhh though i stopped recordign data too early
+    # filename = './data/robot_data_0_0_10_03_26_22_59_41.pkl' #COMPLEX--going straight line from origin at 45 angle and then after few seconds letter it make a circular turn
+    # filename = './data/robot_data_0_0_10_03_26_23_53_22.pkl' #COMPLEX--going straight line from origin at 45 angle and then after few seconds letter it make a right turn but not circular turn
+    filename = './data/robot_data_0_0_10_03_26_23_56_30.pkl' #SIMPLE--going straight line from origin at 45 angle 
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
-    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(1, 1.8, 0.45398), state_stdev = State(1, 1, 0.1), known_start_state=False, encoder_counts_0=pf_data[0][2].encoder_counts)
+    particle_filter = ParticleFilter(parameters.num_particles, map, initial_state = State(0.5, 0.5, 0.65398), state_stdev = State(1, 1, 0.1), known_start_state=False, encoder_counts_0=pf_data[0][2].encoder_counts)
 
     # Create plotting tool for particles
     particle_filter_plot = ParticleFilterPlot(map)
@@ -483,14 +487,9 @@ def offline_pf():
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = row[2] # lidar_sensor_signal
 
-        ##print the u_t
-        # print(f"\n\nU_T: {u_t}\n\n")
+        print(f"\n\nU_T: {u_t}\n\n")
         # print(f"ANGLES:\n{z_t.angles}\n\nDISTANCE(mm):\n{z_t.distances}\n\n")
-        # Run the PF for a time step
-        # target_angle = 0
-        # if target_angle in z_t.angles:
-        #     print(f"ANGLE {target_angle} DISTANCE {z_t.distances[z_t.angles.index(target_angle)]}")
-
+  
         
         particle_filter.update(u_t, z_t, delta_t)
         particle_filter_plot.update(particle_filter.particle_set.mean_state, particle_filter.particle_set, z_t, False)

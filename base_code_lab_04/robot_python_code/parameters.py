@@ -27,23 +27,23 @@ filename_start = './data/robot_data'
 data_name_list = ['time', 'control_signal', 'robot_sensor_signal', 'camera_sensor_signal', 'state_mean', 'state_covariance']
 
 # Experiment trial parameters
-trial_time = 10000 # milliseconds
-extra_trial_log_time = 2000 # milliseconds
+trial_time = 20000 # milliseconds
+extra_trial_log_time = 20000 # milliseconds
 
 # KF parameters
 I3 = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]])
 covariance_plot_scale = 100
 
 # PF parameters, modify the map and num particles as you see fit.
-num_particles = 1000
-
+num_particles = 200
+ 
 # OLD ROOM WALLS
-# wall_corner_list = [
-#     [0, 0, 390/100, 0], 
-#     [390/100, 0, 390/100, 200/100], 
-#     [390/100, 200/100,0, 200/100],
-#     [ 0, 200/100,0, 0],
-# ]
+wall_corner_list = [
+    [0, 0, 390/100, 0], 
+    [390/100, 0, 390/100, 110/100], 
+    [390/100, 110/100,0, 200/100],
+    [ 0, 200/100,0, 0],
+]
 
 
 # NEW ROOM WALLS
@@ -59,16 +59,16 @@ num_particles = 1000
 # ]
 
 # PROFESSOR'S ROOM
-wall_corner_list = [
-    [0, 0, 2.74, 0], 
-    [0, 0, 0, 3.78], 
-    [0, 3.78, 1.92, 3.78],
-    [1.03, 1.61, 1.03, 2.19],
-    [1.03, 2.19, 1.41, 2.19],
-    [1.92, 3.78, 1.92, 3.32],
-    [1.92, 3.32, 2.74, 3.32],
-    [2.74, 3.32, 2.74, 0]
-]
+# wall_corner_list = [
+#     [0, 0, 2.74, 0], 
+#     [0, 0, 0, 3.78], 
+#     [0, 3.78, 1.92, 3.78],
+#     [1.03, 1.61, 1.03, 2.19],
+#     [1.03, 2.19, 1.41, 2.19],
+#     [1.92, 3.78, 1.92, 3.32],
+#     [1.92, 3.32, 2.74, 3.32],
+#     [2.74, 3.32, 2.74, 0]
+# ]
 
 # distance_variance = 0.000210764044943819
 distance_variance = 0.0225
