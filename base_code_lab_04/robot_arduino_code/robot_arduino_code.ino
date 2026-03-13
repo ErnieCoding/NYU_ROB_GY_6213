@@ -5,9 +5,9 @@
 #define SendDeltaTimeInMs 100      // Number ms between messages sent to laptop
 #define ReceiveDeltaTimeInMs 10    // Number ms between checking for control signals sent from laptop
 #define NoSignalDeltaTimeInMs 2000 // Number ms between message receives from laptop before stopping robot
-char ssid[] = "Tenda_9C90E0";//"Tenda_9C95E0";//"Tenda_9C90E0";      // REPLACE with your team's router ssid
-char pass[] = "78972629";  //"82168926";//"78972629";        // REPLACE with your team's router password"78972629"
-char remoteIP[] = "192.168.0.199"; // "192.168.0.199"; // REPLACE with your laptop's IP address on your team's router
+char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid - PROFESSOR'S ROUTER
+char pass[] = "90650529";          // REPLACE with your team's router password - PROFESSOR'S ROUTER
+char remoteIP[] = "192.168.0.200"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;     // local port to listen on - no need to change
 unsigned int remotePort = 4010;    // local port to listen on - no need to change
 int status = WL_IDLE_STATUS;
@@ -40,7 +40,7 @@ Servo myServo;
 // Encoder setup
 #define EncoderOutputA 4          // Encoder output pin A
 #define EncoderOutputB 5          // Encoder output pin B
-#define steering_angle_center 75  // REPLACE with team center angle for servor steering
+#define steering_angle_center 90  // REPLACE with team center angle for servor steering
 int a_state;
 int encoder_a_last_state; 
 int encoder_count;
@@ -87,7 +87,7 @@ void setup()
   }
   Serial.println("Connected to WiFi");
   printWifiStatus();
-  Serial.println("\nStarted connection to server...");
+  Serial.println("\nStarting connection to server...");
   Udp.begin(localPort);
 
   // Bind the RPLIDAR driver to the arduino hardware serial
@@ -95,9 +95,9 @@ void setup()
   lidar.begin(Serial2);
   delay(1000);
   if (lidar.begin(Serial2)) {
-    Serial.println("Started Lidar!");
+   Serial.println("Started Lidar!");
   } else {
-    Serial.println("Failed Lidar!");
+   Serial.println("Failed Lidar!");
   }
   pinMode(RPLidarMotorPin, OUTPUT);
   reset_lidar_message();
@@ -158,12 +158,12 @@ void stop()
 // Drive robot forward a desired speed
 void forward(int speed)
 {
-  digitalWrite(RightMotorDirPin1, HIGH);
-  digitalWrite(RightMotorDirPin2,LOW);
+  digitalWrite(RightMotorDirPin1,LOW);
+  digitalWrite(RightMotorDirPin2,HIGH);
   digitalWrite(LeftMotorDirPin1,HIGH);
   digitalWrite(LeftMotorDirPin2,LOW);
-  analogWrite(LeftSpeedPin, speed * 0.75);
-  analogWrite(RightSpeedPin, speed);
+  analogWrite(LeftSpeedPin, speed);
+  analogWrite(RightSpeedPin, speed * 0.45);
 }
 
 // Receive control signal messages from laptop, but only have delta time has passed, e.g. 10ms
@@ -180,10 +180,10 @@ ControlSignal receive_control_signals(ControlSignal last_control_signal) {
         packetBuffer[len] = 0;
       }
       control_signal = unpack_control_signal(packetBuffer);
-      Serial.print("Received cmd: ");
-      Serial.print(control_signal.speed);
-      Serial.print(", ");
-      Serial.println(control_signal.steering_angle);
+      // Serial.print("Received cmd: ");
+      // Serial.print(control_signal.speed);
+      // Serial.print(", ");
+      // Serial.println(control_signal.steering_angle);
       last_time_rx = new_time_rx;
     }
   }

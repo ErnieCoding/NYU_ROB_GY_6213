@@ -26,8 +26,8 @@ NUM_SNAPSHOTS = 10              # number of later particle snapshots along traje
 MAX_PARTICLES_TO_DRAW = 200    # downsample particles in static figure
 
 # Output behavior
-SHOW_FIGURES = False
-SAVE_FIGURES = True
+SHOW_FIGURES = True
+SAVE_FIGURES = False
 SAVE_DIR = './pf_report_plots_known_start' if KNOWN_START else './pf_report_plots_unknown_start'
 
 
@@ -49,7 +49,7 @@ TRUE_XY = [
     (2.00, 1.30),
 ]
 
-# BIT COMPLEX TRAJECTORY:
+# # BIT COMPLEX TRAJECTORY:
 # DATA_FILE = './data/robot_data_0_0_10_03_26_23_53_22.pkl'    # complex
 # TRUE_XY = [
 #     (0.00, 0.00),
@@ -191,6 +191,11 @@ def run_pf_and_collect(data_file):
 
     true_x, true_y = resample_truth_to_length(TRUE_XY, len(est_x))
     truth_available = (true_x is not None and true_y is not None)
+    final_position_error = None
+    if truth_available:
+        final_position_error = float(
+            position_error(est_x[-1], est_y[-1], true_x[-1], true_y[-1])
+        )
 
     return {
         'map': map_obj,
@@ -204,6 +209,7 @@ def run_pf_and_collect(data_file):
         'initial_particles_x': np.array(initial_x, dtype=float),
         'initial_particles_y': np.array(initial_y, dtype=float),
         'particle_snapshots': particle_snapshots,
+        'final_position_error': final_position_error,
     }
 
 
@@ -387,8 +393,12 @@ def plot_report_figures(data_file, save_dir):
     ensure_dir(save_dir)
     results = run_pf_and_collect(data_file)
     plot_xy_trajectory(results, save_dir)
-    plot_state_vs_time(results, save_dir)
+    # plot_state_vs_time(results, save_dir)
     plot_error_vs_time(results, save_dir)
+    if results['truth_available']:
+        print(f"Final position error: {results['final_position_error']:.4f} m")
+    else:
+        print("Final position error: truth not available")
 
 
 # ============================================================
