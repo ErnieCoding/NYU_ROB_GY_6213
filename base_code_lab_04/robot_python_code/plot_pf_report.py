@@ -17,8 +17,8 @@ import particle_filter
 
 # If True, initialize PF around given initial_state
 KNOWN_START = True
-INITIAL_STATE = particle_filter.State(0.5, 0.5, 0.65398)
-INITIAL_STDEV = particle_filter.State(1.0, 1.0, 0.1)
+INITIAL_STATE = particle_filter.State(0.2, 0.3, 0.65398)
+INITIAL_STDEV = particle_filter.State(0.1, 0.1, 0.1)
 
 # Plot settings
 SHOW_PARTICLE_SNAPSHOTS = True
@@ -28,12 +28,13 @@ MAX_PARTICLES_TO_DRAW = 200    # downsample particles in static figure
 # Output behavior
 SHOW_FIGURES = False
 SAVE_FIGURES = True
-SAVE_DIR = './pf_report_plots'
+SAVE_DIR = './pf_report_plots_known_start' if KNOWN_START else './pf_report_plots_unknown_start'
 
 
 # True trajectory as a hardcoded XY list.
 # Put None if not available for this file.
-TRUE_XY = None
+# TRUE_XY = None
+# DATA_FILE = './data/robot_data_0_0_10_03_26_22_59_41.pkl'
 # SIMPLE TRAJECTORY: 
 DATA_FILE = './data/robot_data_0_0_10_03_26_23_56_30.pkl'  # simple
 TRUE_XY = [

@@ -259,8 +259,10 @@ class ParticleSet:
         self.num_particles = num_particles
         self.particle_list = []
         if known_start_state:
+            print("Initializing with known start state")
             self.generate_initial_state_particles(initial_state, state_stdev)
         else:
+            print("Initializing with unknown start state")
             self.generate_uniform_random_particles(xy_range)
             # self.generate_hardcoded_particles() # HARDCODED PARTICLES FOR TEST
         self.mean_state = State(0, 0, 0)
@@ -468,8 +470,8 @@ def offline_pf():
     # filename = './data/robot_data_0_0_10_03_26_22_35_46.pkl'#SIMPLE--going straight line from origin at 45 angle ishhh though i stopped recordign data too early
     # filename = './data/robot_data_0_0_10_03_26_22_44_42.pkl' #SIMPLE--going straight line from origin at 45 angle ishhh though i stopped recordign data too early
     # filename = './data/robot_data_0_0_10_03_26_22_59_41.pkl' #COMPLEX--going straight line from origin at 45 angle and then after few seconds letter it make a circular turn
-    # filename = './data/robot_data_0_0_10_03_26_23_53_22.pkl' #COMPLEX--going straight line from origin at 45 angle and then after few seconds letter it make a right turn but not circular turn
-    filename = './data/robot_data_0_0_10_03_26_23_56_30.pkl' #SIMPLE--going straight line from origin at 45 angle 
+    filename = './data/robot_data_0_0_10_03_26_23_53_22.pkl' #COMPLEX--going straight line from origin at 45 angle and then after few seconds letter it make a right turn but not circular turn
+    # filename = './data/robot_data_0_0_10_03_26_23_56_30.pkl' #SIMPLE--going straight line from origin at 45 angle 
     pf_data = data_handling.get_file_data_for_pf(filename)
 
     # Instantiate PF with no initial guess
@@ -487,7 +489,7 @@ def offline_pf():
         u_t = np.array([row[2].encoder_counts, row[2].steering]) # robot_sensor_signal
         z_t = row[2] # lidar_sensor_signal
 
-        print(f"\n\nU_T: {u_t}\n\n")
+        # print(f"\n\nU_T: {u_t}\n\n")
         # print(f"ANGLES:\n{z_t.angles}\n\nDISTANCE(mm):\n{z_t.distances}\n\n")
   
         
