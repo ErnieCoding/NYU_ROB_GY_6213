@@ -7,6 +7,6 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
-
+/base_code_lab_04/robot_python_code/data_corrupted
 # other
 .DS_Store
