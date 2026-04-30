@@ -54,9 +54,9 @@ class PoseGraphManager:
         self.factors.append(PoseGraphFactor("lidar", (i, j), motion))
 
     def add_landmark_factor(self, node_id: int, obs: LandmarkObservation) -> None:
-        """Add a visual landmark anchor factor for one keyframe."""
-        # TODO: Formulate marker observation residual against known marker world
-        # poses, and support unknown landmark initialization if needed.
+        """Add a processed landmark observation factor for one keyframe."""
+        # TODO: Formulate the residual between the keyframe pose and the
+        # observed robot_pose_meas, using obs.covariance as the noise model.
         self.factors.append(PoseGraphFactor("landmark", (node_id,), obs, {"marker_id": obs.marker_id}))
 
     def add_loop_closure_factor(self, i: int, j: int, motion: RelativeMotion) -> None:

@@ -5,18 +5,20 @@ from __future__ import annotations
 import math
 from typing import Any
 
+import numpy as np
+
 from FinalProject.robot_python.config.config import CameraConfig
 from FinalProject.robot_python.data_types import CameraFrame, LandmarkObservation, Pose2D
 
 
 class LandmarkObserver:
-    """Detect visual landmarks and convert them into robot-relative observations."""
+    """Extract processed landmark observations from raw camera frames."""
 
     def __init__(self, config: CameraConfig) -> None:
         self.config = config
 
     def observe(self, camera_frame: CameraFrame) -> list[LandmarkObservation]:
-        """Run the marker observation pipeline for one camera frame."""
+        """Run ArUco detection and pose conversion for one camera frame."""
         observations: list[LandmarkObservation] = []
         detections = self.detect_markers(camera_frame.image)
 
@@ -53,18 +55,21 @@ class LandmarkObserver:
         if marker_pose is None:
             return None
 
-        # TODO: Apply camera-to-base extrinsics, associate with marker_world_map,
-        # and quality-filter observations before adding them to the graph.
+        # TODO: Apply camera-to-base extrinsics and quality-filter observations.
+        # If marker_world_map is populated, use it to convert marker-relative
+        # camera measurements into a robot pose measurement in the map frame.
         x = float(marker_pose.get("x", 0.0))
         y = float(marker_pose.get("y", 0.0))
-        range_m = math.hypot(x, y)
-        bearing_rad = math.atan2(y, x)
+        robot_pose_meas = self.config.marker_world_map.get(marker_id, Pose2D(x=x, y=y, theta=0.0))
+        covariance = np.asarray(marker_pose.get("covariance", np.eye(3)), dtype=float)
         return LandmarkObservation(
-            marker_id=marker_id,
             timestamp=timestamp,
-            range_m=range_m,
-            bearing_rad=bearing_rad,
-            relative_pose=Pose2D(x=x, y=y, theta=0.0),
-            world_pose_hint=self.config.marker_world_map.get(marker_id),
-            confidence=float(marker_pose.get("confidence", 1.0)),
+            marker_id=marker_id,
+            robot_pose_meas=robot_pose_meas,
+            covariance=covariance,
+            quality={
+                "confidence": float(marker_pose.get("confidence", 1.0)),
+                "range_m": math.hypot(x, y),
+                "bearing_rad": math.atan2(y, x),
+            },
         )

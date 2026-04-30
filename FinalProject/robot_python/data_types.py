@@ -6,6 +6,8 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 
 def normalize_angle(angle: float) -> float:
     """Normalize an angle in radians to the interval [-pi, pi)."""
@@ -67,11 +69,9 @@ class LidarScan:
 @dataclass
 class EncoderState:
     """Wheel encoder state from the differential-drive base."""
-
     left_ticks: int
     right_ticks: int
     timestamp: float
-
 
 @dataclass
 class RobotFrame:
@@ -106,16 +106,13 @@ class RelativeMotion:
 
 @dataclass
 class LandmarkObservation:
-    """Observation of a known or candidate visual landmark."""
+    """Processed landmark measurement consumed by the shared SLAM core."""
 
-    marker_id: int
     timestamp: float
-    range_m: float
-    bearing_rad: float
-    relative_pose: Pose2D | None = None
-    world_pose_hint: Pose2D | None = None
-    covariance: list[list[float]] | None = None
-    confidence: float = 1.0
+    marker_id: int
+    robot_pose_meas: Pose2D
+    covariance: np.ndarray
+    quality: dict | None = None
 
 
 @dataclass

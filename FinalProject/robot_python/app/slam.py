@@ -8,7 +8,6 @@ from FinalProject.robot_python.backend.optimizer import GraphOptimizer
 from FinalProject.robot_python.backend.pose_graph import PoseGraphManager
 from FinalProject.robot_python.config.config import Config
 from FinalProject.robot_python.data_types import (
-    CameraFrame,
     FrontendOutput,
     LandmarkObservation,
     LocalMapState,
@@ -17,7 +16,6 @@ from FinalProject.robot_python.data_types import (
     RobotFrame,
 )
 from FinalProject.robot_python.frontend.ekf import EKFLocalizer
-from FinalProject.robot_python.frontend.landmark_observation import LandmarkObserver
 from FinalProject.robot_python.frontend.lidar_matching import LidarMatcher
 from FinalProject.robot_python.frontend.motion_model import DifferentialDriveMotionModel
 
@@ -29,7 +27,6 @@ class SLAMSystem:
         self.config = config or Config()
         self.motion_model = DifferentialDriveMotionModel(self.config.robot)
         self.lidar_matcher = LidarMatcher(self.config.robot, self.config.frontend)
-        self.landmark_observer = LandmarkObserver(self.config.camera)
         self.ekf = EKFLocalizer(self.config.frontend, self.motion_model)
         self.pose_graph = PoseGraphManager()
         self.optimizer = GraphOptimizer(self.config.backend)
@@ -78,15 +75,15 @@ class SLAMSystem:
             keyframe_id=self._latest_keyframe_id if created_keyframe else None,
         )
 
-    def detect_landmark(self, camera_frame: CameraFrame) -> list[LandmarkObservation]:
-        """Detect camera landmarks and attach them to the closest timed keyframe."""
-        observations = self.landmark_observer.observe(camera_frame)
-        for observation in observations:
-            node_id = self.pose_graph.find_closest_node_by_time(observation.timestamp)
-            if node_id is not None and self._is_close_camera_keyframe_match(node_id, observation.timestamp):
-                self.pose_graph.add_landmark_factor(node_id, observation)
-                self.local_map.landmark_observations.append(observation)
-        return observations
+    def add_landmark_observation(self, obs: LandmarkObservation) -> bool:
+        """Attach one processed landmark observation to the nearest keyframe."""
+        node_id = self.pose_graph.find_closest_node_by_time(obs.timestamp)
+        if node_id is None or not self._is_close_landmark_keyframe_match(node_id, obs.timestamp):
+            return False
+
+        self.pose_graph.add_landmark_factor(node_id, obs)
+        self.local_map.landmark_observations.append(obs)
+        return True
 
     def run_backend(self) -> dict[int, Pose2D] | None:
         """Run back-end optimization occasionally and cache the latest result."""
@@ -173,10 +170,10 @@ class SLAMSystem:
         if keyframe_id is not None and robot_frame.lidar_scan is not None:
             self.local_map.keyframe_scans[keyframe_id] = robot_frame.lidar_scan
 
-    def _is_close_camera_keyframe_match(self, node_id: int, timestamp: float) -> bool:
-        """Check whether a camera observation is close enough to a keyframe time."""
+    def _is_close_landmark_keyframe_match(self, node_id: int, timestamp: float) -> bool:
+        """Check whether a landmark observation is close enough to a keyframe time."""
         node_timestamp = self.pose_graph.timestamp_by_node[node_id]
-        return abs(node_timestamp - timestamp) <= self.config.frontend.max_camera_keyframe_time_diff_s
+        return abs(node_timestamp - timestamp) <= self.config.frontend.max_landmark_keyframe_time_diff_s
 
     def _maybe_add_loop_closure_factor(self, new_keyframe_id: int, robot_frame: RobotFrame) -> None:
         """Try to add an ICP-based loop-closure factor for a new keyframe."""

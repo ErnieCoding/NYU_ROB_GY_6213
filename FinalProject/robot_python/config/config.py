@@ -52,7 +52,7 @@ class FrontendConfig:
     lidar_match_noise_theta: float = 0.02
     keyframe_translation_m: float = 0.25
     keyframe_rotation_rad: float = 0.25
-    max_camera_keyframe_time_diff_s: float = 0.15
+    max_landmark_keyframe_time_diff_s: float = 0.15
 
 
 @dataclass

@@ -21,11 +21,11 @@ The system has two main input streams:
    - Comes from Arduino/robot UDP in live mode
    - Comes from a pickle file in offline mode
 
-2. **Camera stream**
+2. **Landmark observation stream**
    - ESP32-CAM image frames
-   - Used for ArUco marker detection
+   - Used for ArUco marker detection in live mode before entering SLAM
    - Comes from an OpenCV camera stream in live mode
-   - Comes from timestamp-named image files in offline mode
+   - Comes from saved processed `LandmarkObservation`s in offline mode
 
 The robot stream drives the front-end:
 
@@ -40,13 +40,14 @@ RobotFrame
   -> odometry / LiDAR / loop-closure factors
 ```
 
-The camera stream is asynchronous:
+The landmark observation stream is asynchronous:
 
 ```text
-CameraFrame
+CameraFrame  (live runner only)
   -> ArUco marker detection
   -> marker pose estimation
   -> LandmarkObservation
+  -> SLAMSystem
   -> attach to closest timestamped keyframe
   -> landmark factor in pose graph
 ```
@@ -93,7 +94,6 @@ It owns:
 
 - `DifferentialDriveMotionModel`
 - `LidarMatcher`
-- `LandmarkObserver`
 - `EKFLocalizer`
 - `PoseGraphManager`
 - `GraphOptimizer`
@@ -108,9 +108,7 @@ Important methods:
   - Updates the local map.
   - Adds pose graph keyframes and factors when needed.
 
-- `detect_landmark(camera_frame)`
-  - Runs the camera landmark observer.
-  - Converts camera detections into landmark observations.
+- `add_landmark_observation(obs)`
   - Attaches each observation to the closest keyframe by timestamp.
   - Adds landmark factors to the pose graph.
 
@@ -154,13 +152,13 @@ Important types:
   - One robot-side frame containing encoder data and optional LiDAR scan
 
 - `CameraFrame`
-  - One camera frame with timestamp and image
+  - One camera frame with timestamp and image, used only before live observation extraction
 
 - `RelativeMotion`
   - Relative pose measurement: `dx`, `dy`, `dtheta`
 
 - `LandmarkObservation`
-  - ArUco marker observation with marker id, range, bearing, confidence, and optional world hint
+  - Shared processed SLAM input with timestamp, marker id, robot pose measurement, covariance, and optional quality metadata
 
 - `FrontendOutput`
   - Return value from a front-end update
@@ -297,7 +295,7 @@ Purpose:
 
 - Detect ArUco markers in camera frames.
 - Estimate marker poses with camera calibration.
-- Convert marker poses into robot-relative landmark observations.
+- Convert marker poses into `LandmarkObservation`s.
 
 Current behavior:
 
@@ -382,6 +380,7 @@ Contains `LiveRunner`.
 Purpose:
 
 - Run the system against live robot and camera inputs.
+- Convert raw camera frames into `LandmarkObservation`s before calling `SLAMSystem`.
 
 Current behavior:
 
@@ -418,30 +417,23 @@ The pickle should contain either:
 - `list[RobotFrame]`
 - `list[dict]` that can be converted to `RobotFrame`
 
-Expected camera data:
+Expected landmark data:
 
-- One image directory, default:
-
-```text
-logs/camera/
-```
-
-Image filenames should use timestamp stems:
+- One pickle file, default:
 
 ```text
-1714501001.238.jpg
-1714501001.501.png
+logs/landmark_observations.pkl
 ```
 
 The offline replay flow is:
 
 ```text
 load robot frames
-load camera frames
+load landmark observations
 merge by timestamp
 for each item:
   if RobotFrame -> slam.run_frontend(...)
-  if CameraFrame -> slam.detect_landmark(...)
+  if LandmarkObservation -> slam.add_landmark_observation(...)
   slam.run_backend()
 ```
 
@@ -506,12 +498,12 @@ This drives:
 
 ### CameraFrame
 
-A `CameraFrame` is asynchronous. It does not need to arrive at exactly the same time as a LiDAR scan, but it must have a timestamp.
+A `CameraFrame` is a live-runner input only. It is converted into one or more `LandmarkObservation`s before data enters `SLAMSystem`.
 
-Camera observations are attached to the closest keyframe only if the time gap is small enough:
+Landmark observations are attached to the closest keyframe only if the time gap is small enough:
 
 ```text
-abs(camera_time - keyframe_time) <= max_camera_keyframe_time_diff_s
+abs(observation_time - keyframe_time) <= max_landmark_keyframe_time_diff_s
 ```
 
 ### Keyframes

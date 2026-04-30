@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from FinalProject.robot_python.app.slam import SLAMSystem
 from FinalProject.robot_python.config.config import Config
 from FinalProject.robot_python.data_types import CameraFrame, RobotFrame
+from FinalProject.robot_python.frontend.landmark_observation import LandmarkObserver
 
 
 class LiveRunner:
@@ -16,6 +17,7 @@ class LiveRunner:
     def __init__(self, config: Config | None = None) -> None:
         self.config = config or Config()
         self.slam = SLAMSystem(self.config)
+        self.landmark_observer = LandmarkObserver(self.config.camera)
         self.running = False
 
     def run(self) -> None:
@@ -33,7 +35,8 @@ class LiveRunner:
 
             camera_frame = next(camera_stream, None)
             if camera_frame is not None:
-                self.slam.detect_landmark(camera_frame)
+                for observation in self.landmark_observer.observe(camera_frame):
+                    self.slam.add_landmark_observation(observation)
 
             self.slam.run_backend()
             time.sleep(1.0 / max(self.config.runtime.robot_loop_hz, 1.0))
