@@ -1,27 +1,30 @@
 #include <SPI.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include "RPLidat.h"
+#include "RPLidar.h"
 
+// LiDAR setup
 #define LidarMotorPin 1
 #define NumLidarRaysPerMsg 50
 RPLidar lidar;
 String current_lidar_scan_data;
 int current_num_lidar_rays;
 
+
+// Motors setup
 #define LeftSpeedPin 9
 #define LeftMotorDirPin1 12
 #define LeftMotorDirPin2 11
 
 #define RightSpeedPin 6
-#define RightMotorDirPin1 10
-#define RightMotorDirPin2 13
+#define RightMotorDirPin1 7
+#define RightMotorDirPin2 8
 
 // Encoder outputs setup
-#define RightEncoderOutputA 2
-#define RightEncoderOutputB 3
-#define LeftEncoderOutputA 5
-#define LeftEncoderOutputB 4
+#define RightEncoderOutputA 4 // S2 - WORKS
+#define RightEncoderOutputB 5 // DOESN'T WORK
+#define LeftEncoderOutputA 5 // DOESN'T WORK
+#define LeftEncoderOutputB 3 // S2 - WORKS
 int encoder_left_state;
 int encoder_left_last_state;
 int encoder_left_count;
@@ -33,7 +36,7 @@ int encoder_right_count;
 // Network setup
 #define SendDeltaTimeInMs 100
 #define ReceiveDeltaTimeInMs 10
-#define NoSignalDeltaTImeInMs 2000
+
 char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid
 char pass[] = "90650529";          // REPLACE with your team's router password 
 char remoteIP[] = "192.168.0.200"; // REPLACE with your laptop's IP address on your team's router
@@ -67,6 +70,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("=============Running robot controls=============");
 
+  // Connect to WiFi network
   if (WiFi.status() == WL_NO_MODULE) {
     Serial.println("Communication with WiFi module failed!");
     while(true);
@@ -112,15 +116,21 @@ void setup() {
   pinMode(RightEncoderOutputA, INPUT);
   pinMode(RightEncoderOutputB, INPUT);
   pinMode(LeftEncoderOutputA, INPUT);
-  pinMode(LefttEncoderOutputB, INPUT);
+  pinMode(LeftEncoderOutputB, INPUT);
   
   last_time_rx = millis();
   last_time_tx = millis();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() 
+{
+  ControlSignals control_signal = receive_control_signals(last_control_signal);
+  last_control_signal = control_signal;
 
+  control_robot(control_signal);
+  
+  SensorSignals sensor_signal = get_sensor_signal();
+  send_sensor_signal(sensor_signal);
 }
 
 // Reset LiDAR
@@ -150,9 +160,9 @@ ControlSignals receive_control_signals(ControlSignals last_control_signal)
 
   int new_time_rx = millis();
   if (new_time_rx - last_time_rx > ReceiveDeltaTimeInMs) {
-    int packetSize = Upd.parsePacket();
+    int packetSize = Udp.parsePacket();
     if (packetSize) {
-      int len = Upd.read(packetBuffer, 255);
+      int len = Udp.read(packetBuffer, 255);
       if (len > 0) {
         packetBuffer[len] = 0;
       }
@@ -166,7 +176,7 @@ ControlSignals receive_control_signals(ControlSignals last_control_signal)
     }
   }
 
-  if (new_time_rx - last_time_rx > NoSignalDeltaTimeInMs) {
+  if (new_time_rx - last_time_rx > 2000) {
     control_signal.speed_left = 0;
     control_signal.speed_right = 0;
   }
@@ -177,15 +187,14 @@ ControlSignals receive_control_signals(ControlSignals last_control_signal)
 ControlSignals unpack_control_signal(char* packed_control_signal_as_char) 
 {
   ControlSignals control_signal;
-  char* token;
+  char* token1;
+  char* token2;
 
   // Unpack the desired speeed
-  token = strtok(packed_control_signal_as_char, ",");
-  control_signal.speed = atof(token);
-
-  // Unpack the desired steering angle
-  token = strtok(NULL, ",");
-  control_signal.steering_angle = atof(token);
+  token1 = strtok(packed_control_signal_as_char, ",");
+  token2 = strtok(NULL, ",");
+  control_signal.speed_left = atof(token1);
+  control_signal.speed_right = atof(token2);
 
   return control_signal;
 }
@@ -195,6 +204,7 @@ ControlSignals unpack_control_signal(char* packed_control_signal_as_char)
 
 /*Control robot from control signals received
   - left and right speeds
+  - direction?
 */
 
 void control_robot(ControlSignals control_signal)
@@ -216,9 +226,9 @@ void control_robot(ControlSignals control_signal)
 
 /*------------------------------------------------------------*/
 
-/*Gather and send control signals to the laptop*/
+/*Gather and send sensor signals to the laptop*/
 
-SensorSignal get_sensor_signal()
+SensorSignals get_sensor_signal()
 {
   encoder_update();
   last_sensor_signal.encoder_left_count = encoder_left_count;
@@ -230,7 +240,8 @@ SensorSignal get_sensor_signal()
 }
 
 // Get new lidar measurements
-void lidar_update() {
+void lidar_update() 
+{
   if (IS_OK(lidar.waitPoint())) {
     float distance = lidar.getCurrentPoint().distance;
     if (distance > 100 && current_num_lidar_rays < NumLidarRaysPerMsg) {
@@ -239,7 +250,7 @@ void lidar_update() {
       current_lidar_scan_data +=  "," + String(angle) + "," + String(int(distance));
     }
   } else {
-    analogWrite(RPLidarMotorPin, 255); //stop the rplidar motor
+    analogWrite(LidarMotorPin, 255); //stop the rplidar motor
     
     // try to detect RPLIDAR... 
     rplidar_response_device_info_t info;
@@ -248,7 +259,7 @@ void lidar_update() {
        lidar.startScan();
        
        // Start motor rotating at max allowed speed
-       analogWrite(RPLidarMotorPin, 255);
+       analogWrite(LidarMotorPin, 255);
        delay(1000);
     }
   }
@@ -261,22 +272,45 @@ void lidar_update() {
 */
 
 // Get new encoder measurements
-void encoder_update() { 
-   a_state = digitalRead(EncoderOutputA); // Reads the "current" state of the outputA
-   // If the previous and the current state of the outputA are different, that means a Pulse has occured
-   if (a_state != encoder_a_last_state){     
-     // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
-     if (digitalRead(EncoderOutputB) != a_state) { 
-       encoder_count ++;
-     } else {
-       encoder_count --;
-     }
-   } 
-   encoder_a_last_state = a_state; // Updates the previous state of the outputA with the current state
- }
+void encoder_update() 
+{
+
+  /* ---- LEGACY CODE
+  a_state = digitalRead(EncoderOutputA); // Reads the "current" state of the outputA
+  */
+
+
+  /* ---- LEGACY CODE
+  // If the previous and the current state of the outputA are different, that means a Pulse has occured
+  if (a_state != encoder_a_last_state){     
+    // If the outputB state is different to the outputA state, that means the encoder is rotating clockwise
+    if (digitalRead(EncoderOutputB) != a_state) { 
+      encoder_count ++;
+    } else {
+      encoder_count --;
+    }
+  }
+  */
+
+  encoder_left_state = digitalRead(LeftEncoderOutputA);
+  encoder_right_state = digitalRead(RightEncoderOutputA);
+
+  // Update encoder count for LEFT motor
+  if (encoder_left_state != encoder_left_last_state) {
+    encoder_left_count++;
+  }
+
+  // Update encdoder count for RIGHT motor
+  if (encoder_right_state != encoder_right_last_state) {
+    encoder_right_count++;
+  }
+
+  encoder_left_last_state = encoder_left_state;
+  encoder_right_last_state = encoder_right_state;
+}
 
 // Send a message with sensor signals to the laptop, but only after a preset time, e.g. 100 ms
-void send_sensor_signal(SensorSignal sensor_signal)
+void send_sensor_signal(SensorSignals sensor_signal)
 {
   int new_time_tx = millis();
   if (new_time_tx - last_time_tx > SendDeltaTimeInMs) {
