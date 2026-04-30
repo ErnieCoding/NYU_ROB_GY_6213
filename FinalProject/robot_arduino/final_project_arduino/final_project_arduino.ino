@@ -37,9 +37,12 @@ int encoder_right_count;
 #define SendDeltaTimeInMs 100
 #define ReceiveDeltaTimeInMs 10
 
-char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid
-char pass[] = "90650529";          // REPLACE with your team's router password 
-char remoteIP[] = "192.168.0.200"; // REPLACE with your laptop's IP address on your team's router
+// char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid
+// char pass[] = "90650529";          // REPLACE with your team's router password 
+char ssid[] = "ESP32-CAM-NETWORK";
+char pass[] = "password1234";
+
+char remoteIP[] = "192.168.0.197"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;
 unsigned int remotePort = 4010;    
 int status = WL_IDLE_STATUS;
@@ -76,13 +79,12 @@ void setup() {
     while(true);
   }
   
-  while (status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to SSID: ");
-    Serial.println(ssid);
-    status = WiFi.begin(ssid, pass);
-
-    delay(10000);
+  WiFi.begin(ssid, pass);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
+  Serial.println("\nConnected!");
 
   Serial.println("Connected to WiFi");
   printWifiStatus();
@@ -213,7 +215,7 @@ void control_robot(ControlSignals control_signal)
 
   // Direction for left and right motors going forward
   digitalWrite(RightMotorDirPin1, HIGH);
-  digitalWrite(RightMotorDirPin1, LOW);
+  digitalWrite(RightMotorDirPin2, LOW);
   digitalWrite(LeftMotorDirPin1, HIGH);
   digitalWrite(LeftMotorDirPin2, LOW);
 

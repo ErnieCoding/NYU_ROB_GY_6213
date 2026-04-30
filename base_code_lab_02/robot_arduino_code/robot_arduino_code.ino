@@ -7,7 +7,7 @@
 #define NoSignalDeltaTimeInMs 2000 // Number ms between message receives from laptop before stopping robot
 char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid - PROFESSOR'S ROUTER
 char pass[] = "90650529";          // REPLACE with your team's router password - PROFESSOR'S ROUTER
-char remoteIP[] = "192.168.0.199"; // REPLACE with your laptop's IP address on your team's router
+char remoteIP[] = "192.168.0.197"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;     // local port to listen on - no need to change
 unsigned int remotePort = 4010;    // local port to listen on - no need to change
 int status = WL_IDLE_STATUS;
@@ -18,7 +18,7 @@ char packetBuffer[256];            //buffer to hold incoming packet
 
 // Lidar setup
 #include "RPLidar.h"
-#define RPLidarMotorPin 3          // Lidar motor control pin
+#define RPLidarMotorPin 1          // Lidar motor control pin
 #define NumLidarRaysPerMsg 50      // How many lidar ray measurements to send at a time
 RPLidar lidar;
 String current_lidar_scan_data;
