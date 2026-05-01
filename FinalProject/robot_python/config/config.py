@@ -16,7 +16,7 @@ class RobotConfig:
     wheel_base_m: float = 0.23
     meters_per_tick: float = 0.0005
     lidar_min_range_m: float = 0.05
-    lidar_max_range_m: float = 8.0
+    lidar_max_range_m: float = 12.0
 
 
 @dataclass
@@ -25,16 +25,30 @@ class CameraConfig:
 
     stream_url: str = "http://192.168.4.1:81/stream"
     aruco_marker_size_m: float = 0.08
+    # Camera matrix K:
+    # [[348.0321225    0.         188.28539766]
+    #  [  0.         355.6030584  105.48395813]
+    #  [  0.           0.           1.        ]]
+
+    # Distortion coefficients:
+    # [[ 0.08988576 -2.60316437 -0.02748353  0.02115694 13.16262713]]
+
     camera_matrix: list[list[float]] = field(
         default_factory=lambda: [
-            [600.0, 0.0, 320.0],
-            [0.0, 600.0, 240.0],
+            [348.0321225,   0,188.28539766],
+            [0,355.6030584,105.48395813],
             [0.0, 0.0, 1.0],
         ]
     )
-    distortion_coefficients: list[float] = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0, 0.0])
+    distortion_coefficients: list[float] = field(default_factory=lambda: [0.08988576, -2.60316437, -0.02748353, 0.02115694, 13.16262713])
     camera_to_base: Pose2D = field(default_factory=Pose2D)
-    marker_world_map: dict[int, Pose2D] = field(default_factory=dict)
+    marker_world_map: dict[int, Pose2D] = field(
+    default_factory=lambda: {
+        0: Pose2D(x=0.0, y=0.0, theta=0.0),
+        1: Pose2D(x=1.5, y=0.0, theta=0.0),
+        2: Pose2D(x=1.5, y=2.0, theta=0.0),
+    }
+    )   
 
 
 @dataclass

@@ -39,7 +39,7 @@ int encoder_right_count;
 
 // char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid
 // char pass[] = "90650529";          // REPLACE with your team's router password 
-char ssid[] = "ESP32-CAM-NETWORK";
+char ssid[] = "ESP32-CAM-Network";
 char pass[] = "password1234";
 
 char remoteIP[] = "192.168.0.197"; // REPLACE with your laptop's IP address on your team's router

@@ -9,8 +9,8 @@ dist_coeffs = data["dist_coeffs"]
 # Marker real size: need to modify this if you used a different size when generating the markers
 marker_length = 0.12  # meters = 12 cm
 
-# ESP32 stream
-url = "http://192.168.0.200:81/stream"
+# ESP32 streamhttp://192.168.0.199
+url = "http://192.168.4.1:81/stream"
 cap = cv2.VideoCapture(url)
 
 # ArUco setup
