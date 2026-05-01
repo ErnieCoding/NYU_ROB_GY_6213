@@ -128,7 +128,8 @@ def main():
 
 
     cmd_state = {'left': 0, 'right': 0} # state dictionary for speeds
-    key_state  = {'up': False, 'left': False, 'right': False}
+    key_state = {'up': False, 'left': False, 'right': False}
+    ctrl = {'joystick': None}
 
     BASE_SPEED = 85
     SPIN_SPEED = 70
@@ -183,6 +184,30 @@ def main():
             f"document.getElementById('key-left').classList.toggle('key-active',{str(key_state['left']).lower()});"
             f"document.getElementById('key-right').classList.toggle('key-active',{str(key_state['right']).lower()});"
         )
+    
+    DEADZONE = 0.05 # controller deadzone
+    
+    def on_controller_switch():
+        if controller_switch.value:
+            try:
+                pygame.init()
+                pygame.joystick.init()
+                if pygame.joystick.get_count() == 0:
+                    print("[Controller] No controller found.")
+                    controller_switch.value = False
+                    return
+                ctrl['joystick'] = pygame.joystick.Joystick(0)
+                ctrl['joystick'].init()
+                print(f"[Controller] Connected: {ctrl['joystick'].get_name()}")
+            except Exception as e:
+                print(f"[Controller] Init error: {e}")
+                controller_switch.value = False
+        else:
+            if ctrl['joystick']:
+                ctrl['joystick'].quit()
+            ctrl['joystick'] = None
+            pygame.joystick.quit()
+            cmd_state['left'] = cmd_state['right'] = 0  # stop robot on disconnect
 
 
     # Update connection
@@ -365,7 +390,7 @@ def main():
 
             # Switches
             with ui.card().classes('w-full'):
-                controller_switch = ui.switch('Controller')
+                controller_switch = ui.switch('Controller', on_change=on_controller_switch)
                 logging_switch    = ui.switch('Data Logging')
                 udp_switch        = ui.switch('Robot Connect')
 
@@ -424,6 +449,34 @@ def main():
     ui.keyboard(on_key=update_commands)
     async def control_loop():
         update_connection_to_robot()
+        
+        if controller_switch.value and ctrl['joystick']:
+            pygame.event.pump()                    # refresh joystick state
+            js = ctrl['joystick']
+
+            r2    = js.get_axis(5)                 # R2 trigger:   [-1, 1]
+            steer = js.get_axis(0)                 # Left stick X: [-1, 1]
+            speed = (r2 + 1) / 2                   # normalize to  [ 0, 1]
+
+            if speed > DEADZONE:
+                # Forward + steer: mix speed and steering into L/R
+                # steer > 0 → turn right (slow right, fast left)
+                left_val  = speed * (1 + steer)
+                right_val = speed * (1 - steer)
+                cmd_state['left']  = int(min(1.0, max(0.0, left_val))  * BASE_SPEED)
+                cmd_state['right'] = int(min(1.0, max(0.0, right_val)) * BASE_SPEED)
+            elif abs(steer) > DEADZONE:
+                # No throttle → spin in place
+                if steer > 0:   # stick right → spin right (left wheel drives)
+                    cmd_state['left']  = int(steer  * SPIN_SPEED)
+                    cmd_state['right'] = 0
+                else:            # stick left  → spin left  (right wheel drives)
+                    cmd_state['left']  = 0
+                    cmd_state['right'] = int(-steer * SPIN_SPEED)
+            else:
+                cmd_state['left'] = cmd_state['right'] = 0
+        
+        
         robot.control_loop(cmd_state['left'], cmd_state['right'], logging_switch.value)
         encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
         encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
