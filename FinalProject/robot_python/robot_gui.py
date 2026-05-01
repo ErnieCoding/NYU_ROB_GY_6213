@@ -54,7 +54,6 @@ def main():
 
     # Robot variables
     robot = robot_code.Robot()
-    cmd_state = {'left': 0, 'right': 0} # state dictionary for speeds
 
     # Lidar data
     max_lidar_range = 12
@@ -104,18 +103,53 @@ def main():
                 )
                 lidar_distance_list[index] = distance_in_mm / 1000
 
+
+    cmd_state = {'left': 0, 'right': 0} # state dictionary for speeds
+    key_state  = {'up': False, 'left': False, 'right': False}
+
+    BASE_SPEED = 85
+    SPIN_SPEED = 70
+    TURN_OFFSET = 40
+
     # Determine what speed to send to each motor
     def update_commands(e: events.KeyEventArguments):
+        pressed = not e.action.keyup   # True on keydown/repeat, False on keyup
 
-        if e.action.keyup:
-            cmd_state['left'] = 0
+        shift_pressed = e.modifiers.shift
+        if shift_pressed and e.key.arrow_up:
+            key_state['up'] = pressed
+        elif shift_pressed and e.key.arrow_left:
+            key_state['left'] = pressed
+        elif shift_pressed and e.key.arrow_right:
+            key_state['right'] = pressed
+        else:
+            return  # ignore all non-arrow keys
+
+        if key_state['up']:
+            if key_state['left']:
+                # Driving forward + curving left: slow down left wheel
+                cmd_state['left']  = BASE_SPEED - TURN_OFFSET
+                cmd_state['right'] = BASE_SPEED
+            elif key_state['right']:
+                # Driving forward + curving right: slow down right wheel
+                cmd_state['left']  = BASE_SPEED
+                cmd_state['right'] = BASE_SPEED - TURN_OFFSET
+            else:
+                # Straight forward
+                cmd_state['left']  = BASE_SPEED
+                cmd_state['right'] = BASE_SPEED
+        elif key_state['left']:
+            # Pivot left in place: right wheel drives, left wheel stopped
+            cmd_state['left']  = 0
+            cmd_state['right'] = SPIN_SPEED
+        elif key_state['right']:
+            # Pivot right in place: left wheel drives, right wheel stopped
+            cmd_state['left']  = SPIN_SPEED
             cmd_state['right'] = 0
-            return
-
-        if e.modifiers.shift and e.action.keydown:
-            if e.key.arrow_up:
-                cmd_state['left'] = 100
-                cmd_state['right'] = 100
+        else:
+            # No arrow keys held → stop
+            cmd_state['left']  = 0
+            cmd_state['right'] = 0
 
 
     # Update connection
