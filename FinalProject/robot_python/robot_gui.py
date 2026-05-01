@@ -52,6 +52,29 @@ def get_time_in_ms():
 @ui.page('/')
 def main():
 
+    # Custom UI elements
+    ui.add_head_html("""
+    <style>
+    .arrow-keys-widget { display:flex; flex-direction:column; align-items:center; gap:5px; padding:10px; }
+    .key-row           { display:flex; gap:5px; }
+    .key {
+        width:46px; height:46px;
+        display:flex; align-items:center; justify-content:center;
+        background:#1e1e1e; border:1px solid #3a3a3a; border-radius:7px;
+        font-size:20px; color:#555;
+        transition: background 110ms ease, color 110ms ease,
+                    transform 110ms ease, box-shadow 110ms ease;
+        box-shadow: 0 3px 0 #0a0a0a;
+        user-select:none;
+    }
+    .key.key-active {
+        background:#0f3028; border-color:#2a7a5e; color:#3ddba0;
+        transform:translateY(2px); box-shadow:0 1px 0 #061a14;
+    }
+    .key.key-inactive { opacity:0.25; pointer-events:none; }
+    </style>
+    """)
+
     # Robot variables
     robot = robot_code.Robot()
 
@@ -123,7 +146,10 @@ def main():
         elif shift_pressed and e.key.arrow_right:
             key_state['right'] = pressed
         else:
-            return  # ignore all non-arrow keys
+            key_state['left'] = False
+            key_state['right'] = False
+            key_state['up'] = False
+            #return  # ignore all non-arrow keys
 
         if key_state['up']:
             if key_state['left']:
@@ -150,6 +176,13 @@ def main():
             # No arrow keys held → stop
             cmd_state['left']  = 0
             cmd_state['right'] = 0
+        
+        # Animate when keys are pressed
+        ui.run_javascript(
+            f"document.getElementById('key-up').classList.toggle('key-active',{str(key_state['up']).lower()});"
+            f"document.getElementById('key-left').classList.toggle('key-active',{str(key_state['left']).lower()});"
+            f"document.getElementById('key-right').classList.toggle('key-active',{str(key_state['right']).lower()});"
+        )
 
 
     # Update connection
@@ -174,14 +207,6 @@ def main():
             if robot.connected_to_hardware:
                 robot.eliminate_udp_connection()
                 robot.connected_to_hardware = False
-
-    # Update the speed slider if steering is not enabled
-    def enable_speed():
-        d = 0
-
-    # Update the steering slider if steering is not enabled
-    def enable_steering():
-        d = 0
 
     # TODO: Visualize LiDAR with a different library specifically for LiDAR
     # Visualize the lidar scans
@@ -316,54 +341,84 @@ def main():
 
     #     print("Start time:", robot.trial_start_time)
 
-    # Create the gui title bar
-    with ui.card().classes('w-full  items-center'):
-        ui.label('LiDAR-intertial SLAM w/ Visual Landmarks').style('font-size: 24px;')
+    
+    with ui.row().classes('w-full h-full gap-2 no-wrap'):
 
-    # Create the video camera, lidar, and encoder sensor visualizations.
-    with ui.card().classes('w-full'):
-        with ui.grid(columns=3).classes('w-full items-center'):
-            with ui.card().classes('w-full items-center h-60'):
+        # ── LEFT COLUMN ─────────────────────────────────────────────
+        with ui.column().classes('w-64 gap-2 flex-shrink-0'):
+
+            # Arrow key widget
+            with ui.card().classes('w-full items-center'):
+                ui.label('KEYBOARD').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
+                ui.html("""
+                <div class="arrow-keys-widget">
+                    <div class="key-row">
+                        <div id="key-up" class="key">↑</div>
+                    </div>
+                    <div class="key-row">
+                        <div id="key-left"  class="key">←</div>
+                        <div                class="key key-inactive">↓</div>
+                        <div id="key-right" class="key">→</div>
+                    </div>
+                </div>
+                """, sanitize=False)
+
+            # Switches
+            with ui.card().classes('w-full'):
+                controller_switch = ui.switch('Controller')
+                logging_switch    = ui.switch('Data Logging')
+                udp_switch        = ui.switch('Robot Connect')
+
+            # Encoder counts
+            with ui.card().classes('w-full'):
+                ui.label('ENCODERS').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
+                with ui.row().classes('w-full items-center justify-between'):
+                    ui.label('Left')
+                    encoder_left_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
+                with ui.row().classes('w-full items-center justify-between'):
+                    ui.label('Right')
+                    encoder_right_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
+
+        # ── RIGHT COLUMN (plots + camera) ───────────────────────────
+        with ui.column().classes('flex-1 gap-2 overflow-hidden'):
+
+            # Plot — top half
+            with ui.card().classes('w-full items-center'):
+                ui.label('LiDAR / Localization').style('font-weight:600;')
+                main_plot = ui.pyplot(figsize=(10, 4))  # wider, shorter
+
+            # Camera — bottom half
+            with ui.card().classes('w-full overflow-hidden items-center'):
+                ui.label('Camera').style('font-weight:600;')
                 if stream_video:
-                    video_image = ui.interactive_image('/video/frame').classes('w-full h-full')
+                    video_image = ui.interactive_image('/video/frame').classes('w-full')
                 else:
-                    ui.image('./a_robot_image.jpg').props('height=2')
-                    video_image = None
+                    ui.image('./robot_image.jpg').style(
+                        'width:100%; max-height: 285px; object-fit:contain;')
+                    video_image = None    
+    
+    
+    # ----------------- LEGACY CODE FOR LIDAR, CAMERA, AND ENCODER UI -----------------
+    # # Create the video camera, lidar, and encoder sensor visualizations.
+    # with ui.card().classes('w-full'):
+    #     with ui.grid(columns=3).classes('w-full items-center'):
+    #         with ui.card().classes('w-full items-center h-60'):
+    #             if stream_video:
+    #                 video_image = ui.interactive_image('/video/frame').classes('w-full h-full')
+    #             else:
+    #                 ui.image('./a_robot_image.jpg').props('height=2')
+    #                 video_image = None
 
-            with ui.card().classes('w-full items-center h-60'):
-                main_plot = ui.pyplot(figsize=(3, 3))
+    #         with ui.card().classes('w-full items-center h-60'):
+    #             main_plot = ui.pyplot(figsize=(3, 3))
 
-            with ui.card().classes('items-center h-60'):
-                ui.label('Encoder LEFT:').style('text-align: center;')
-                encoder_left_count_label = ui.label('0')
-                ui.label('Encoder RIGHT:').style('text-align: center;')
-                encoder_right_count_label = ui.label('0')
-                logging_switch = ui.switch('Data Logging ')
-                udp_switch = ui.switch('Robot Connect')
-
-    # Create the robot manual control slider and switch for speed
-    with ui.card().classes('w-full'):
-        with ui.grid(columns=4).classes('w-full'):
-            with ui.card().classes('w-full items-center'):
-                ui.label('SPEED:').style('text-align: center;')
-            with ui.card().classes('w-full items-center'):
-                slider_speed = ui.slider(min=0, max=100, value=0)
-            with ui.card().classes('w-full items-center'):
-                ui.label().bind_text_from(slider_speed, 'value').style('text-align: center;')
-            with ui.card().classes('w-full items-center'):
-                speed_switch = ui.switch('Enable', on_change=lambda: enable_speed())
-
-    # Create the robot manual control slider and switch for steering
-    with ui.card().classes('w-full'):
-        with ui.grid(columns=4).classes('w-full'):
-            with ui.card().classes('w-full items-center'):
-                ui.label('STEER:').style('text-align: center;')
-            with ui.card().classes('w-full items-center'):
-                slider_steering = ui.slider(min=-20, max=20, value=0)
-            with ui.card().classes('w-full items-center'):
-                ui.label().bind_text_from(slider_steering, 'value').style('text-align: center;')
-            with ui.card().classes('w-full items-center'):
-                steering_switch = ui.switch('Enable', on_change=lambda: enable_steering())
+    #         with ui.card().classes('items-center h-60'):
+    #             ui.label('Encoder LEFT:').style('text-align: center;')
+    #             encoder_left_count_label = ui.label('0')
+    #             ui.label('Encoder RIGHT:').style('text-align: center;')
+    #             encoder_right_count_label = ui.label('0')
+    #             logging_switch = ui.switch('Data Logging ')
+    #             udp_switch = ui.switch('Robot Connect')
 
     # Update slider values, plots, etc. and run robot control loop
     ui.keyboard(on_key=update_commands)
