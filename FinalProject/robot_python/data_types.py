@@ -23,7 +23,7 @@ class Pose2D:
     theta: float = 0.0
 
     def moved_by(self, motion: RelativeMotion) -> Pose2D:
-        """Apply a relative motion in the local robot frame."""
+        """Apply a relative motion in the world frame."""
         cos_t = math.cos(self.theta)
         sin_t = math.sin(self.theta)
         world_dx = cos_t * motion.dx - sin_t * motion.dy
@@ -33,6 +33,14 @@ class Pose2D:
             y=self.y + world_dy,
             theta=normalize_angle(self.theta + motion.dtheta),
         )
+
+    def propagate_pose(self, motion: RelativeMotion) -> Pose2D:
+        """Update pose in robot-local frame (no world transform)."""
+        return Pose2D(
+            x=self.x + motion.dx,
+            y=self.y + motion.dy,
+            theta=normalize_angle(self.theta + motion.dtheta),
+    )
 
     def distance_to(self, other: Pose2D) -> float:
         """Return Euclidean distance between pose translations."""
