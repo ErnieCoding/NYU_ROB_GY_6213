@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python data/download_dataset.py)",
+      "Bash(python -c ' *)",
+      "Bash(pip index *)",
+      "Bash(where python3.11)",
+      "Bash(where python3.12)",
+      "Bash(py -3.11 --version)",
+      "Bash(py -3.12 --version)",
+      "Bash(py -3.10 --version)",
+      "Bash(py --list)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -c \"import scipy; print\\('scipy', scipy.__version__\\); import numpy; print\\('numpy', numpy.__version__\\); import matplotlib; print\\('matplotlib', matplotlib.__version__\\)\")",
+      "Bash(python data/run_intel_dataset.py)",
+      "Bash(Get-Content \"C:\\\\Users\\\\lukelo\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-lukelo-Desktop-Spring-2026-Robots-NYU-ROB-GY-6213-FinalProject-robot-python\\\\cbb3ca04-4c94-43f2-a082-73b4159a35eb\\\\tasks\\\\bh0z7gtze.output\" -ErrorAction SilentlyContinue)"
+    ]
+  }
+}
