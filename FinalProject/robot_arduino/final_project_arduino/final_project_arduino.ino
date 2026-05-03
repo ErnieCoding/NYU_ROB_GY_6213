@@ -43,8 +43,11 @@ int encoder_right_count;
 // char pass[] = "password1234";
 char ssid[] = "Tenda_7F76C0";
 char pass[] = "24449038";
+// char ssid[] = "Tenda_9C9E80";
+// char pass[] = "42232674";
 
-char remoteIP[] = "192.168.0.196";
+char remoteIP[] = "192.168.0.196"; // Tenda_7F76C0
+// char remoteIP[] = "192.168.0.199"; // Tenda_9C9E80
 
 
 unsigned int localPort = 4010;
