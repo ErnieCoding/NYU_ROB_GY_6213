@@ -511,7 +511,7 @@ def plot_many_trial_predictions_one_by_one(directory):
 # -----------------------------
 # Motion data (fitting encoder counts - distance)
 # -----------------------------
-files_and_data = {
+files_and_data = [
     # filename, encoder_left_start, encoder_right_start, encoder_left_finish, encoder_right_finish, x_finish, y_finish, theta_start, theta_finish
    {"filename": "robot_data_0_0_02_05_26_23_59_25.pkl",
     "encoder_left_start": 47944,
@@ -735,9 +735,9 @@ files_and_data = {
     "theta_start": 30,
     "theta_finish": 212
    },
-}
+]
 
-files_and_data_spinning = {
+files_and_data_spinning = [
     # going clockwise
     {
         "filename": "robot_data_0_0_03_05_26_13_20_10.pkl",
@@ -858,7 +858,7 @@ files_and_data_spinning = {
         "theta_start": 173,
         "theta_finish": 190,
     },
-}
+]
 
 
 # -----------------------------
