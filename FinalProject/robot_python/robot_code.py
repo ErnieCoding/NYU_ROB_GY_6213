@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import socket
 from time import strftime
+import threading
 
 # Parameters
 import parameters
@@ -50,14 +51,14 @@ class Robot:
     #     self.particle_filter.update(u_t, z_t, delta_t)
 
     # One iteration of the control loop to be called repeatedly
-    def control_loop(self, cmd_speed_left = 0, cmd_speed_right = 0, logging_switch_on = False):
-        # Get camera signal
-        self.camera_sensor_signal = self.camera_sensor.get_signal(self.camera_sensor_signal)
-        
+    def control_loop(self, cmd_speed_left = 0, cmd_speed_right = 0, logging_switch_on = False):        
         # Receive msg
-        if self.msg_sender != None:
+        if self.msg_sender is not None:
             self.robot_sensor_signal = self.msg_receiver.receive_robot_sensor_signal(self.robot_sensor_signal)
         
+        self.camera_sensor_signal = self.camera_sensor.get_signal(self.camera_sensor_signal)
+        print(f"[CAMERA] Received sensor signal: {self.camera_sensor_signal}")
+
         # TODO: UPDATE TO OUR STATE ESTIMATION
         # Update the state estimates
         # self.update_state_estimate()
@@ -66,11 +67,11 @@ class Robot:
         control_signal = [cmd_speed_left, cmd_speed_right]
                 
         # Send msg
-        if self.msg_receiver != None:
+        if self.msg_receiver is not None:
             self.msg_sender.send_control_signal(control_signal)
             
         # Log the data
-        self.data_logger.log(logging_switch_on, time.perf_counter(), control_signal, self.robot_sensor_signal)
+        self.data_logger.log(logging_switch_on, time.perf_counter(), control_signal, self.robot_sensor_signal, self.camera_sensor_signal)
 
 
 
@@ -95,19 +96,25 @@ class UDPCommunication:
         self.localPort = localPort
         self.bufferSize = bufferSize
         self.UDPServerSocket = socket.socket(family = socket.AF_INET, type = socket.SOCK_DGRAM)
+        self.UDPServerSocket.settimeout(0.05)
         self.UDPServerSocket.bind((localIP, localPort))
         
     # Receive a message from the robot
     def receive_msg(self):
-        bytesAddressPair = self.UDPServerSocket.recvfrom(self.bufferSize)
-        message = bytesAddressPair[0]
-        address = bytesAddressPair[1]
-        clientMsg = "{}".format(message.decode())
-        clientIP = "{}".format(address)
+        try:
+            bytesAddressPair = self.UDPServerSocket.recvfrom(self.bufferSize)
+            message = bytesAddressPair[0]
+            address = bytesAddressPair[1]
+            clientMsg = "{}".format(message.decode())
 
-        print(f"[DEBUG] Received msg from the robot: {clientMsg}")
-        
-        return clientMsg
+            # print(f"[DEBUG] Received msg from the robot: {clientMsg}")
+            return clientMsg
+        except (socket.timeout, TimeoutError):
+            return ""
+        except Exception as e:
+            print(f"[UDP] receive_msg error: {e}")
+            return ""
+
        
     # Send a message to the robot
     def send_msg(self, msg):
@@ -139,7 +146,7 @@ class DataLogger:
 
         
     # Log one time step of data
-    def log(self, logging_switch_on, time, control_signal, robot_sensor_signal, state_mean = [0, 0, 0]):
+    def log(self, logging_switch_on, time, control_signal, robot_sensor_signal, camera_sensor_signal, state_mean = [0, 0, 0]):
         if not logging_switch_on:
             if self.currently_logging:
                 self.currently_logging = False
@@ -152,8 +159,9 @@ class DataLogger:
             self.dictionary['time'].append(time)
             self.dictionary['control_signal'].append(control_signal)
             self.dictionary['robot_sensor_signal'].append(robot_sensor_signal)
+            self.dictionary['camera_sensor_signal'].append(camera_sensor_signal)
             self.dictionary['state_mean'].append(state_mean)
-            # self.dictionary['state_covariance'].append(particle_set)
+            
 
             self.line_count += 1
             if self.line_count > parameters.max_num_lines_before_write:
@@ -264,42 +272,143 @@ class CameraSensor:
     # Constructor
     def __init__(self, camera_url):
         self.camera_url = camera_url
-        # self.cap = cv2.VideoCapture(camera_id) # WINDOWS
-        self.cap = cv2.VideoCapture(camera_url) # LINUX
-        self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
+        self.cap = None
+        self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_250)
         self.parameters = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.parameters)
+
+        self._lock = threading.Lock()
+        self._latest_raw_frame = None
+        self._latest_annotated_frame = None
+        self._latest_pose = None
+        self._running = True
+        self._thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._thread.start()
+    
+    def _capture_loop(self):
+        while self._running:
+            if self.cap is None or not self.cap.isOpened():
+                print(f"[CAMERA] Attempting to connect to {self.camera_url}...")
+                if self.cap is not None:
+                    self.cap.release()
+                
+                cap = cv2.VideoCapture(self.camera_url)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+                cap.set(cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, 3000)
+
+                if cap.isOpened():
+                    self.cap = cap
+                    print("[CAMERA Connected...]")
+                else:
+                    cap.release()
+                    time.sleep(2.0)
+                    continue
+
+            ret, raw_frame = self.cap.read()
+            if not ret or raw_frame is None:
+                print("[CAMERA] Stream lost. Reconnecting...")
+                self.cap.release()
+                self.cap = None
+                time.sleep(1.0)
+                continue
+
+            annotated_frame = raw_frame.copy()
+            pose_result = None
+
+            gray = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2GRAY)
+            corners, ids, _ = self.detector.detectMarkers(gray)
+
+            if ids is not None:
+                cv2.aruco.drawDetectedMarkers(annotated_frame, corners, ids)
+
+                rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+                    corners,
+                    parameters.marker_length,
+                    parameters.camera_matrix,
+                    parameters.dist_coeffs
+                )
+
+                for i in range(len(ids)):
+                    marker_id = ids[i][0]
+                    rvec = rvecs[i]
+                    tvec = tvecs[i][0]
+
+                    x_cm = tvec[0] * 100
+                    y_cm = tvec[1] * 100
+                    z_cm = tvec[2] * 100
+
+                    R, _ = cv2.Rodrigues(rvec)
+                    yaw   = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
+                    pitch = np.degrees(np.arctan2(-R[2, 0], np.sqrt(R[2, 1]**2 + R[2, 2]**2)))
+                    roll  = np.degrees(np.arctan2(R[2, 1], R[2, 2]))
+
+                    print(
+                        f"[CAMERA] ID {marker_id} | "
+                        f"X: {x_cm:.2f} cm, Y: {y_cm:.2f} cm, Z: {z_cm:.2f} cm | "
+                        f"Yaw: {yaw:.2f}°, Pitch: {pitch:.2f}°, Roll: {roll:.2f}°"
+                    )
+
+                    cv2.drawFrameAxes(
+                        annotated_frame,
+                        parameters.camera_matrix,
+                        parameters.dist_coeffs,
+                        rvec,
+                        tvecs[i],
+                        0.05
+                    )
+
+                    cv2.putText(
+                        annotated_frame,
+                        f"ID {marker_id}: X={x_cm:.1f} Y={y_cm:.1f} Z={z_cm:.1f} cm",
+                        (5, 40 + 30 * i),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.55,
+                        (0, 255, 0),
+                        2
+                    )
+
+                    
+                    pose_result = [x_cm, y_cm, z_cm, yaw, pitch, roll]
+
+            # --- Atomically store results ---
+            with self._lock:
+                self._latest_raw_frame = raw_frame
+                self._latest_annotated_frame = annotated_frame
+                self._latest_pose = pose_result
+
+            time.sleep(0.05)
+
+    def get_latest_frame(self):
+        with self._lock:
+            frame = self._latest_annotated_frame
+            if frame is None:
+                frame = self._latest_raw_frame
+            
+            return frame.copy() if frame is not None else None
+    
+    def get_pose_estimate(self):
+        with self._lock:
+            pose = self._latest_pose
+        if pose is not None:
+            return True, pose
+        return False, []
         
     # Get a new pose estimate from a camera image
     def get_signal(self, last_camera_signal):
-        camera_signal = last_camera_signal
         ret, pose_estimate = self.get_pose_estimate()
+
         if ret:
-            camera_signal = pose_estimate
+            return pose_estimate
         
-        return camera_signal
+        return last_camera_signal
         
-    # If there is a new image, calculate a pose estimate from the fiducial tag on the robot.
-    def get_pose_estimate(self):
-        ret, frame = self.cap.read()
-        if not ret:
-            return False, []
-        
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        corners, ids, rejectedImgPoints = self.detector.detectMarkers(gray)
-        if ids is not None:
-            # Estimate pose for each detected marker
-            for i in range(len(ids)):
-                rvec, tvec, _ = aruco.estimatePoseSingleMarkers(corners[i], parameters.marker_length, parameters.camera_matrix, parameters.dist_coeffs)
-                pose_estimate = [tvec[0][0][0], tvec[0][0][1], tvec[0][0][2], rvec[0][0][0], rvec[0][0][1], rvec[0][0][2]]
-            return True, pose_estimate
-        
-        return False, []
     
     # Close the camera stream
     def close(self):
-        self.cap.release()
-        cv2.destroyAllWindows()
+        self._running = False
+        self._thread.join(timeout=2.0)
+        if self.cap is not None:
+            self.cap.release()
 
 
 # A storage vessel for an instance of a robot signal
@@ -329,7 +438,7 @@ class RobotSensorSignal:
     # Convert the sensor signal to a list of ints and floats.
     def to_list(self):
         sensor_data_list = []
-        sensor_data_list.append(self.encoder__left_counts)
+        sensor_data_list.append(self.encoder_left_counts)
         sensor_data_list.append(self.encoder_right_counts)
         sensor_data_list.append(self.num_lidar_rays)
         for i in range(self.num_lidar_rays):

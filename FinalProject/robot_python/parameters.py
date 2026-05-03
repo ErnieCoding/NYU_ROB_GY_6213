@@ -4,18 +4,20 @@ import numpy as np
 
 # UDP parameters
 # localIP = "192.168.4.2" # LAPTOP'S IP ON ESP32-CAM
-localIP = "192.168.0.196" # LAPTOP'S IP on wifi router
+localIP = "192.168.0.196" # LAPTOP'S IP on wifi router Tenda_7F76C0
+# localIP = "192.168.0.199" # LAPTOP'S IP ON WIFI ROUTER Tenda_9C9E80
 
 # arduinoIP = "192.168.4.3" # ARDUINO'S IP ON ESP32-CAM
-arduinoIP = "192.168.0.197" # ARDUINO'S IP ON WIFI ROUTER
+arduinoIP = "192.168.0.197" # ARDUINO'S IP ON WIFI ROUTER Tenda_7F76C0
+# arduinoIP = "192.168.0.198" # ARDUINO'S IP ON WIFI ROUTER Tenda_9C9E80
 localPort = 4010
 arduinoPort = 4010
 bufferSize = 1024
 
 # Camera parameters
-camera_url = "" # CAMERA'S IP ON THE WIFI ROUTER
+camera_url = "http://192.168.0.195:81/stream" # CAMERA'S IP ON THE WIFI ROUTER
 # camera_url = "http://192.168.0.195:81/stream" # CAMERA'S IP ON ESP32-CAM
-marker_length = 0.067
+marker_length = 0.095
 camera_matrix = np.array([[ 348.0321225, 0, 188.28539766 ],
                           [ 0, 355.6030584, 105.48395813 ],
                           [ 0, 0, 1 ]], dtype=np.float32)

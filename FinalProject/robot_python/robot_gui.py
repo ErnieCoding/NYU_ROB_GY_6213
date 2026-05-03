@@ -18,7 +18,7 @@ import parameters
 
 # Global variables
 logging = False
-stream_video = False
+stream_video = True
 
 matplotlib.use('Agg')
 
@@ -39,9 +39,9 @@ def convert(frame: np.ndarray) -> bytes:
 #     return video_capture
 
 
-# def update_video(video_image):
-#     if stream_video:
-#         video_image.force_reload()
+def update_video(video_image):
+    if stream_video:
+        video_image.force_reload()
 
 
 def get_time_in_ms():
@@ -103,12 +103,11 @@ def main():
     # Enable frame grabs from the video stream.
     @app.get('/video/frame')
     async def grab_video_frame() -> Response:
-        if not video_capture.isOpened():
-            return "[ERROR] ERROR CAPTURING VIDEO"
-        _, frame = await run.io_bound(video_capture.read)
+        frame = robot.camera_sensor.get_latest_frame()  # Non-blocking, always fresh
         if frame is None:
-            return "[ERROR] EMPTY FRAME" 
+            return Response(status_code=503)
         jpeg = await run.cpu_bound(convert, frame)
+        
         return Response(content=jpeg, media_type='image/jpeg')
 
     # Convert lidar data to something visible in correct units.
@@ -411,6 +410,8 @@ def main():
                     ui.label('Right')
                     encoder_right_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
 
+        CAMERA_W = 400
+        CAMERA_H = 296
         # ── RIGHT COLUMN (plots + camera) ───────────────────────────
         with ui.column().classes('flex-1 gap-2 overflow-hidden'):
 
@@ -423,7 +424,12 @@ def main():
             with ui.card().classes('w-full overflow-hidden items-center'):
                 ui.label('Camera').style('font-weight:600;')
                 if stream_video:
-                    video_image = ui.interactive_image('/video/frame').classes('w-full')
+                    video_image = ui.interactive_image('/video/frame').style(
+                        f"width:{CAMERA_W}px;"
+                        f"height:{CAMERA_H}px;"
+                        f"object-fit:contain;"
+                        f"display:block;"
+                    )
                 else:
                     ui.image('./robot_image.jpg').style(
                         'width:100%; max-height: 285px; object-fit:contain;')
@@ -493,7 +499,7 @@ def main():
         # show_localization_plot()
         # show_lidar_plot()
         
-        # update_video(video_image)
+        update_video(video_image)
 
     ui.timer(0.1, control_loop)
 
