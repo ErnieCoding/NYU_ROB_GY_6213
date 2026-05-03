@@ -39,10 +39,14 @@ int encoder_right_count;
 
 // char ssid[] = "Tenda_9C9620";      // REPLACE with your team's router ssid
 // char pass[] = "90650529";          // REPLACE with your team's router password 
-char ssid[] = "ESP32-CAM-Network";
-char pass[] = "password1234";
+// char ssid[] = "ESP32-CAM-Network";
+// char pass[] = "password1234";
+char ssid[] = "Tenda_7F76C0";
+char pass[] = "24449038";
 
-char remoteIP[] = "192.168.4.4"; // REPLACE with your laptop's IP address on your team's router
+char remoteIP[] = "192.168.0.196";
+
+
 unsigned int localPort = 4010;
 unsigned int remotePort = 4010;    
 int status = WL_IDLE_STATUS;
@@ -321,7 +325,7 @@ void encoder_update()
   }
   */
 
-  encoder_left_state = digitalRead(LeftEncoderOutputA);
+  encoder_left_state = digitalRead(LeftEncoderOutputB);
   encoder_right_state = digitalRead(RightEncoderOutputA);
 
   // Update encoder count for LEFT motor

@@ -11,6 +11,7 @@ marker_length = 0.095  # meters = 12 cm
 
 # ESP32 streamhttp://192.168.0.199
 url = "http://192.168.4.1:81/stream"
+# url = "http://192.168.0.195:81/stream"
 cap = cv2.VideoCapture(url)
 
 # ArUco setup

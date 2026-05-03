@@ -3,15 +3,18 @@ import math
 import numpy as np
 
 # UDP parameters
-localIP = "192.168.4.4" # Put your laptop computer's IP here 199
-arduinoIP = "192.168.4.2" # Put your arduino's IP here 200
+# localIP = "192.168.4.2" # LAPTOP'S IP ON ESP32-CAM
+localIP = "192.168.0.196" # LAPTOP'S IP on wifi router
+
+# arduinoIP = "192.168.4.3" # ARDUINO'S IP ON ESP32-CAM
+arduinoIP = "192.168.0.197" # ARDUINO'S IP ON WIFI ROUTER
 localPort = 4010
 arduinoPort = 4010
 bufferSize = 1024
 
 # Camera parameters
-# camera_url = "http://192.168.0.199:81/stream"
-camera_url = "http://192.168.4.1:81/stream"
+camera_url = "" # CAMERA'S IP ON THE WIFI ROUTER
+# camera_url = "http://192.168.0.195:81/stream" # CAMERA'S IP ON ESP32-CAM
 marker_length = 0.067
 camera_matrix = np.array([[ 348.0321225, 0, 188.28539766 ],
                           [ 0, 355.6030584, 105.48395813 ],
