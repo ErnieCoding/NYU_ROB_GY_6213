@@ -10,7 +10,8 @@ arduinoPort = 4010
 bufferSize = 1024
 
 # Camera parameters
-camera_url = "http://192.168.0.199:81/stream"
+# camera_url = "http://192.168.0.199:81/stream"
+camera_url = "http://192.168.4.1:81/stream"
 marker_length = 0.067
 camera_matrix = np.array([[ 348.0321225, 0, 188.28539766 ],
                           [ 0, 355.6030584, 105.48395813 ],

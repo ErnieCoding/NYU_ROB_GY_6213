@@ -18,7 +18,7 @@ import parameters
 
 # Global variables
 logging = False
-stream_video = False
+stream_video = True
 
 matplotlib.use('Agg')
 
@@ -128,12 +128,12 @@ def main():
 
 
     cmd_state = {'left': 0, 'right': 0} # state dictionary for speeds
-    key_state = {'up': False, 'left': False, 'right': False}
+    key_state = {'up': False, 'left': False, 'right': False, 'down': False}
     ctrl = {'joystick': None}
 
-    BASE_SPEED = 85
-    SPIN_SPEED = 70
-    TURN_OFFSET = 40
+    BASE_SPEED = 65
+    SPIN_SPEED = 55
+    TURN_OFFSET = 30
 
     # Determine what speed to send to each motor
     def update_commands(e: events.KeyEventArguments):
@@ -146,10 +146,13 @@ def main():
             key_state['left'] = pressed
         elif shift_pressed and e.key.arrow_right:
             key_state['right'] = pressed
+        elif shift_pressed and e.key.arrow_down:
+            key_state['down'] = pressed
         else:
             key_state['left'] = False
             key_state['right'] = False
             key_state['up'] = False
+            key_state['down'] = False
             #return  # ignore all non-arrow keys
 
         if key_state['up']:
@@ -166,13 +169,16 @@ def main():
                 cmd_state['left']  = BASE_SPEED
                 cmd_state['right'] = BASE_SPEED
         elif key_state['left']:
-            # Pivot left in place: right wheel drives, left wheel stopped
-            cmd_state['left']  = 0
+            # Spin in place
+            cmd_state['left']  = (-1) * SPIN_SPEED
             cmd_state['right'] = SPIN_SPEED
         elif key_state['right']:
             # Pivot right in place: left wheel drives, right wheel stopped
             cmd_state['left']  = SPIN_SPEED
-            cmd_state['right'] = 0
+            cmd_state['right'] = (-1) * SPIN_SPEED
+        elif key_state['down']:
+            cmd_state['left'] = (-1) * BASE_SPEED
+            cmd_state['right'] = (-1) * BASE_SPEED
         else:
             # No arrow keys held → stop
             cmd_state['left']  = 0
@@ -183,6 +189,7 @@ def main():
             f"document.getElementById('key-up').classList.toggle('key-active',{str(key_state['up']).lower()});"
             f"document.getElementById('key-left').classList.toggle('key-active',{str(key_state['left']).lower()});"
             f"document.getElementById('key-right').classList.toggle('key-active',{str(key_state['right']).lower()});"
+            f"document.getElementById('key-down').classList.toggle('key-active',{str(key_state['down']).lower()});"
         )
     
     DEADZONE = 0.05 # controller deadzone
@@ -382,7 +389,7 @@ def main():
                     </div>
                     <div class="key-row">
                         <div id="key-left"  class="key">←</div>
-                        <div                class="key key-inactive">↓</div>
+                        <div id="key-down"  class="key">↓</div>
                         <div id="key-right" class="key">→</div>
                     </div>
                 </div>
@@ -476,7 +483,7 @@ def main():
             else:
                 cmd_state['left'] = cmd_state['right'] = 0
         
-        
+
         robot.control_loop(cmd_state['left'], cmd_state['right'], logging_switch.value)
         encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
         encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
