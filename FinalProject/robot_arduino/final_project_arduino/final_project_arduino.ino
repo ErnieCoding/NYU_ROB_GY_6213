@@ -328,14 +328,19 @@ void encoder_update()
   encoder_left_state = digitalRead(LeftEncoderOutputB);
   encoder_right_state = digitalRead(RightEncoderOutputA);
 
+  bool left_forward = (digitalRead(LeftMotorDirPin1) == HIGH);
+  bool right_forward = (digitalRead(RightMotorDirPin1) == HIGH);
+
   // Update encoder count for LEFT motor
   if (encoder_left_state != encoder_left_last_state) {
-    encoder_left_count++;
+    if (left_forward) encoder_left_count++;
+    else encoder_left_count--;
   }
 
   // Update encdoder count for RIGHT motor
   if (encoder_right_state != encoder_right_last_state) {
-    encoder_right_count++;
+    if (right_forward) encoder_right_count++;
+    else encoder_right_count--;
   }
 
   encoder_left_last_state = encoder_left_state;

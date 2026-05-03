@@ -737,20 +737,128 @@ files_and_data = {
    },
 }
 
-files_and_data_curve = [
-    ['robot_data_60_10_28_01_26_13_44_28.pkl', 61 / 100, 31 / 100],
-    ['robot_data_60_10_28_01_26_13_45_14.pkl', 61 / 100, 32 / 100],
-    ['robot_data_60_10_28_01_26_13_45_56.pkl', 61 / 100, 30 / 100],
-    ['robot_data_60_10_28_01_26_13_46_26.pkl', 61 / 100, 31 / 100],
-    ['robot_data_60_10_28_01_26_13_47_10.pkl', 62 / 100, 29 / 100],
-    ['robot_data_60_10_28_01_26_13_48_25.pkl', 70 / 100, 106 / 100],
-    ['robot_data_60_10_28_01_26_13_49_08.pkl', 73 / 100, 106 / 100],
-    ['robot_data_60_10_28_01_26_13_50_55.pkl', 73 / 100, 71 / 100],
-    ['robot_data_60_10_28_01_26_13_51_34.pkl', 76 / 100, 69 / 100],
-    ['robot_data_60_10_28_01_26_13_52_07.pkl', 78 / 100, 71 / 100],
-    ['robot_data_60_10_28_01_26_13_52_35.pkl', 76 / 100, 70 / 100],
-    ['robot_data_60_10_28_01_26_13_53_08.pkl', 76 / 100, 71 / 100],
-]
+files_and_data_spinning = {
+    # going clockwise
+    {
+        "filename": "robot_data_0_0_03_05_26_13_20_10.pkl",
+        "encoder_left_start": 3017,
+        "encoder_right_pass": -1753,
+        "encoder_left_finish": 3762,
+        "encoder_right_finish": -2084,
+        "theta_start": 17,
+        "theta_finish": 136,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_21_47.pkl",
+        "encoder_left_start": 3766,
+        "encoder_right_pass": -2071,
+        "encoder_left_finish": 5011,
+        "encoder_right_finish": -2831,
+        "theta_start": 104,
+        "theta_finish": 301,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_23_37.pkl",
+        "encoder_left_start": 5011,
+        "encoder_right_pass": -2831,
+        "encoder_left_finish": 7042,
+        "encoder_right_finish": -4143,
+        "theta_start": 300,
+        "theta_finish": 252,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_34_11.pkl",
+        "encoder_left_start": 4451,
+        "encoder_right_pass": 6728,
+        "encoder_left_finish": 6532,
+        "encoder_right_finish": 5374,
+        "theta_start": 269,
+        "theta_finish": 228,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_35_47.pkl",
+        "encoder_left_start": 6532,
+        "encoder_right_pass": 5374,
+        "encoder_left_finish": 9526,
+        "encoder_right_finish": 3366,
+        "theta_start": 227,
+        "theta_finish": 317,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_38_35.pkl", # spinning clockwise 3 times
+        "encoder_left_start": 7315,
+        "encoder_right_pass": 6623,
+        "encoder_left_finish": 14585,
+        "encoder_right_finish": 1486,
+        "theta_start": 174,
+        "theta_finish": 174,
+    },
+
+    # going counter clockwise
+    {
+        "filename": "robot_data_0_0_03_05_26_13_26_38.pkl",
+        "encoder_left_start": 7042,
+        "encoder_right_pass": -4143,
+        "encoder_left_finish": 6887,
+        "encoder_right_finish": -3624,
+        "theta_start": 251,
+        "theta_finish": 161,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_27_55.pkl",
+        "encoder_left_start": 6887,
+        "encoder_right_pass": -3624,
+        "encoder_left_finish": 6664,
+        "encoder_right_finish": -3046,
+        "theta_start": 161,
+        "theta_finish": 55,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_28_52.pkl",
+        "encoder_left_start": 6664,
+        "encoder_right_pass": -3046,
+        "encoder_left_finish": 6017,
+        "encoder_right_finish": -1978,
+        "theta_start": 55,
+        "theta_finish": 226,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_30_05.pkl",
+        "encoder_left_start": 6026,
+        "encoder_right_pass": -1836,
+        "encoder_left_finish": 4803,
+        "encoder_right_finish": -83,
+        "theta_start": 200,
+        "theta_finish": 267,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_32_47.pkl",
+        "encoder_left_start": 5186,
+        "encoder_right_pass": 5419,
+        "encoder_left_finish": 4451,
+        "encoder_right_finish": 6728,
+        "theta_start": 124,
+        "theta_finish": 269,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_36_46.pkl",
+        "encoder_left_start": 9526,
+        "encoder_right_pass": 3366,
+        "encoder_left_finish": 7315,
+        "encoder_right_finish": 6623,
+        "theta_start": 317,
+        "theta_finish": 175,
+    },
+    {
+        "filename": "robot_data_0_0_03_05_26_13_40_13.pkl", # spinning counter clockwise 3 times
+        "encoder_left_start": 14585,
+        "encoder_right_pass": 1486,
+        "encoder_left_finish": 9322,
+        "encoder_right_finish": 8245,
+        "theta_start": 173,
+        "theta_finish": 190,
+    },
+}
 
 
 # -----------------------------
