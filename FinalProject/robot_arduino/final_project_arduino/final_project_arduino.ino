@@ -42,7 +42,7 @@ int encoder_right_count;
 char ssid[] = "ESP32-CAM-Network";
 char pass[] = "password1234";
 
-char remoteIP[] = "192.168.0.197"; // REPLACE with your laptop's IP address on your team's router
+char remoteIP[] = "192.168.4.4"; // REPLACE with your laptop's IP address on your team's router
 unsigned int localPort = 4010;
 unsigned int remotePort = 4010;    
 int status = WL_IDLE_STATUS;
@@ -78,6 +78,8 @@ void setup() {
     Serial.println("Communication with WiFi module failed!");
     while(true);
   }
+
+  delay(5000); // Wait for the esp32 network to come up
   
   WiFi.begin(ssid, pass);
   while (WiFi.status() != WL_CONNECTED) {
@@ -211,17 +213,42 @@ ControlSignals unpack_control_signal(char* packed_control_signal_as_char)
 
 void control_robot(ControlSignals control_signal)
 {
-  //TODO: receive controls for motor speeds LEFT and RIGHT
+  int left_speed;
+  int right_speed;
 
-  // Direction for left and right motors going forward
-  digitalWrite(RightMotorDirPin1, HIGH);
-  digitalWrite(RightMotorDirPin2, LOW);
-  digitalWrite(LeftMotorDirPin1, HIGH);
-  digitalWrite(LeftMotorDirPin2, LOW);
+  if (control_signal.speed_left < 0 && control_signal.speed_right > 0) {
+    // SPIN RIGHT IN PLACE
+    left_speed = control_signal.speed_left * (-2);
+    right_speed = control_signal.speed_right * 2;
+    digitalWrite(RightMotorDirPin1, HIGH);
+    digitalWrite(RightMotorDirPin2, LOW);
+    digitalWrite(LeftMotorDirPin1, LOW);
+    digitalWrite(LeftMotorDirPin2, HIGH);
+  } else if (control_signal.speed_right < 0 && control_signal.speed_left > 0) {
+    // SPIN LEFT IN PLACE
+    left_speed = control_signal.speed_left * 2;
+    right_speed = control_signal.speed_right * (-2);
+    digitalWrite(RightMotorDirPin1, LOW);
+    digitalWrite(RightMotorDirPin2, HIGH);
+    digitalWrite(LeftMotorDirPin1, HIGH);
+    digitalWrite(LeftMotorDirPin2, LOW);
+  } else if (control_signal.speed_left < 0 && control_signal.speed_right < 0) {
+    left_speed = control_signal.speed_left * (-2);
+    right_speed = control_signal.speed_right * (-2);
+    digitalWrite(RightMotorDirPin1, LOW);
+    digitalWrite(RightMotorDirPin2, HIGH);
+    digitalWrite(LeftMotorDirPin1, LOW);
+    digitalWrite(LeftMotorDirPin2, HIGH);
+  } else {
+    // Normal forward direction
+    left_speed = control_signal.speed_left * 2;
+    right_speed = control_signal.speed_right * 2;
+    digitalWrite(RightMotorDirPin1, HIGH);
+    digitalWrite(RightMotorDirPin2, LOW);
+    digitalWrite(LeftMotorDirPin1, HIGH);
+    digitalWrite(LeftMotorDirPin2, LOW);
+  }
 
-
-  int left_speed = control_signal.speed_left * 2;
-  int right_speed = control_signal.speed_right * 2;
   analogWrite(LeftSpeedPin, left_speed);
   analogWrite(RightSpeedPin, right_speed);
 }
