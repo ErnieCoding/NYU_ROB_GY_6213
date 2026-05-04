@@ -40,40 +40,18 @@ extra_trial_log_time = 20000 # milliseconds
 I3 = np.array([[1, 0, 0],[0, 1, 0], [0, 0, 1]])
 covariance_plot_scale = 100
  
-# OLD ROOM WALLS
-wall_corner_list = [
-    [0, 0, 390/100, 0], 
-    [390/100, 0, 390/100, 110/100], 
-    [390/100, 110/100,0, 200/100],
-    [ 0, 200/100,0, 0],
-]
-
-
-# NEW ROOM WALLS
-# wall_corner_list = [
-#     [0, 0, 390/100, 0],
-#     [390/100, 0, 390/100, 200/100],
-#     [390/100, 200/100, 257/100, 200/100],
-#     [257/100, 200/100, 257/100, 246/100],
-#     [257/100, 246/100, 130/100, 246/100],
-#     [130/100, 246/100, 130/100, 200/100],
-#     [130/100, 200/100, 0, 200/100],
-#     [0, 200/100, 0, 0]
-# ]
-
-# PROFESSOR'S ROOM
-# wall_corner_list = [
-#     [0, 0, 2.74, 0], 
-#     [0, 0, 0, 3.78], 
-#     [0, 3.78, 1.92, 3.78],
-#     [1.03, 1.61, 1.03, 2.19],
-#     [1.03, 2.19, 1.41, 2.19],
-#     [1.92, 3.78, 1.92, 3.32],
-#     [1.92, 3.32, 2.74, 3.32],
-#     [2.74, 3.32, 2.74, 0]
-# ]
 
 # TODO: Update variances for our Lidar, Camera, and encoders
-lidar_variance = 0.0225
-encoder_variance = ...
+
+# Parameters for adaptive measurement variance calculations - used during EKF correction
+LIDAR_CALIB_DIST = np.array([300, 400, 500, 600, 700, 800, 900, 1000, 1200])
+LIDAR_CALIB_BIAS = np.array([5.9245, 13.2960, 9.7610, 6.0795, 9.1545,
+                        9.1160,  4.0555,  6.7945,  3.6305])
+LIDAR_COVARIANCE_FLOOR = 0.02
+C_LINEAR = 6.433919e-04
+B_LINEAR = -0.195505
+
+
+encoder_left_variance = ...
+encoder-right_variance = ...
 camera_variance = ...

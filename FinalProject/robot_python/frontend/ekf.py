@@ -11,6 +11,8 @@ from FinalProject.robot_python.data_types import EncoderState, Pose2D, PoseEstim
 from FinalProject.robot_python.frontend.motion_model import DifferentialDriveMotionModel
 from FinalProject.robot_python.data_types import normalize_angle
 
+import parameters
+
 class EKFLocalizer:
     """Maintain a local pose estimate with EKF predict/correct steps."""
 
@@ -144,3 +146,26 @@ class EKFLocalizer:
     def _zero_covariance(self) -> np.ndarray:
         """Create zero covariance matrix."""
         return np.zeros((3, 3))
+    
+    def correct_measurement(self, z_mm):
+        """
+        Given a raw LiDAR measurement z_mm,
+        return the bias-corrected measurement.
+
+        Uses linear interpolation between calibration points.
+        Clamps to the nearest known value outside the calibration range.
+        """
+        bias = float(np.interp(z_mm, parameters.LIDAR_CALIB_DIST, parameters.LIDAR_CALIB_BIAS))
+        
+        return z_mm - bias
+    
+    def adapt_covariance(self, z_mm):
+        """
+        Returns measurement noise variance R (mm²)
+        using the linear model: R = c·z + b
+        z_mm: raw LiDAR reading in millimeters
+        """
+        
+        R = parameters.C_LINEAR * z_mm + parameters.B_LINEAR
+        
+        return max(R, parameters.LIDAR_COVARIANCE_FLOOR)
