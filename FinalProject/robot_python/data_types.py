@@ -140,6 +140,8 @@ class LocalMapState:
     """Front-end local map state built from corrected poses and recent scans."""
 
     trajectory: list[PoseEstimate] = field(default_factory=list)
+    map_points: list[tuple[float, float]] = field(default_factory=list)
+    optimized_map_points: list[tuple[float, float]] = field(default_factory=list)
     keyframe_scans: dict[int, LidarScan] = field(default_factory=dict)
     landmark_observations: list[LandmarkObservation] = field(default_factory=list)
 

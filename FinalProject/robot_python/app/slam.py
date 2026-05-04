@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 
 from FinalProject.robot_python.backend.optimizer import GraphOptimizer
@@ -92,6 +93,7 @@ class SLAMSystem:
             return None
 
         self._last_optimized_trajectory = self.optimizer.optimize(self.pose_graph)
+        self._rebuild_optimized_map(self._last_optimized_trajectory)
         self._new_keyframes_since_optimization = 0
         self._last_optimization_time = time.time()
         return self._last_optimized_trajectory
@@ -162,13 +164,54 @@ class SLAMSystem:
         robot_frame: RobotFrame,
         keyframe_id: int | None,
     ) -> None:
-        """Update the local map from the corrected front-end pose."""
-        # TODO: Convert LiDAR scans into local map points or an occupancy grid.
-        # For Version 1, keep corrected poses and keyframe scans so mapping can
-        # be filled in without changing the front-end/back-end contract.
+        """Update the local map from the corrected global pose estimate."""
+        pose = pose_estimate.pose
+
+        # Store the corrected pose history.
         self.local_map.trajectory.append(pose_estimate)
+
+        # Convert local LiDAR rays into global/map-frame points using the
+        # current global robot pose.
+        if robot_frame.lidar_scan is not None:
+            scan_points = []
+
+            for r, angle in zip(robot_frame.lidar_scan.ranges, robot_frame.lidar_scan.angles):
+                if r <= 0:
+                    continue
+
+                global_angle = pose.theta + angle
+                x_map = pose.x + r * math.cos(global_angle)
+                y_map = pose.y + r * math.sin(global_angle)
+
+                scan_points.append((x_map, y_map))
+
+            self.local_map.map_points.extend(scan_points)
+
+        # Keep raw keyframe scans so the optimized/global map can be rebuilt
+        # later from backend-corrected keyframe poses.
         if keyframe_id is not None and robot_frame.lidar_scan is not None:
             self.local_map.keyframe_scans[keyframe_id] = robot_frame.lidar_scan
+
+    def _rebuild_optimized_map(self, optimized_poses: dict[int, Pose2D]) -> None:
+        """Rebuild backend-corrected map points from raw keyframe scans."""
+        optimized_points = []
+
+        for keyframe_id, scan in self.local_map.keyframe_scans.items():
+            pose = optimized_poses.get(keyframe_id)
+            if pose is None:
+                continue
+
+            for r, angle in zip(scan.ranges, scan.angles):
+                if r <= 0:
+                    continue
+
+                global_angle = pose.theta + angle
+                x_map = pose.x + r * math.cos(global_angle)
+                y_map = pose.y + r * math.sin(global_angle)
+
+                optimized_points.append((x_map, y_map))
+
+        self.local_map.optimized_map_points = optimized_points
 
     def _is_close_landmark_keyframe_match(self, node_id: int, timestamp: float) -> bool:
         """Check whether a landmark observation is close enough to a keyframe time."""
