@@ -241,118 +241,165 @@ def main():
 
     # TODO: Visualize LiDAR with a different library specifically for LiDAR
     # Visualize the lidar scans
-    # def show_lidar_plot():
-    #     with main_plot:
-    #         fig = main_plot.fig
-    #         fig.patch.set_facecolor('black')
-    #         plt.clf()
-    #         plt.style.use('dark_background')
-    #         plt.tick_params(axis='x', colors='lightgray')
-    #         plt.tick_params(axis='y', colors='lightgray')
+    def draw_room():
+        with main_plot:
+            fig = main_plot.fig
 
-    #         for i in range(num_angles):
-    #             distance = lidar_distance_list[i]
-    #             cos_ang = lidar_cos_angle_list[i]
-    #             sin_ang = lidar_sin_angle_list[i]
-    #             x = [distance * cos_ang, max_lidar_range * cos_ang]
-    #             y = [distance * sin_ang, max_lidar_range * sin_ang]
-    #             plt.plot(x, y, 'r')
-    #         plt.grid(True)
-    #         plt.xlim(-2, 2)
-    #         plt.ylim(-2, 2)
+            # Draw walls
+            for w in parameters.walls:
+                x1, y1 = parameters.corners[w[0]]
+                x2, y2 = parameters.corners[w[1]]
+                plt.plot([x1, x2], [y1, y2], color='black', linewidth=2)
+            
+            # Draw corners
+            for name, (x, y) in parameters.corners.items():
+                plt.scatter(x, y, color='blue', s=30)
+                
+                # Corner label
+                plt.text(x + 2, y + 2, name, fontsize=8, color='blue')
+                
+                # Coordinate label (smaller, slightly offset)
+                plt.text(x + 2, y - 6, f"({int(x)}, {int(y)})", fontsize=6, color='gray')
+            
+            # Draw tags
+            for tag_id, (x, y) in parameters.tags.items():
+                plt.scatter(x, y, color='red', s=50, marker='x')
+                
+                # Tag label
+                plt.text(x + 2, y + 2, f"T{tag_id}", fontsize=8, color='red')
+                
+                # Coordinate label (smaller)
+                plt.text(x + 2, y - 6, f"({int(x)}, {int(y)})", fontsize=6, color='darkred')
+            
+            plt.scatter([], [], color='blue', label='Corners')
+            plt.scatter([], [], color='red', marker='x', label='ArUco Tags')
+            plt.legend(loc='upper left')
+
+            plt.title("Map Layout with Corners and ArUco Tags")
+            plt.xlabel("X (cm)")
+            plt.ylabel("Y (cm)")
+            plt.axis('equal')
+            plt.grid(True, linestyle='--', alpha=0.5)
+
+            all_x = [p[0] for p in parameters.corners.values()] + [p[0] for p in parameters.tags.values()]
+            all_y = [p[1] for p in parameters.corners.values()] + [p[1] for p in parameters.tags.values()]
+
+            plt.xlim(min(all_x) - 20, max(all_x) + 20)
+            plt.ylim(min(all_y) - 20, max(all_y) + 20)
+                        
+    # TODO: Use Open3D for LiDAR visualization
+    def show_lidar_plot():
+        with main_plot:
+            fig = main_plot.fig
+            fig.patch.set_facecolor('black')
+            plt.clf()
+            plt.style.use('dark_background')
+            plt.tick_params(axis='x', colors='lightgray')
+            plt.tick_params(axis='y', colors='lightgray')
+
+            for i in range(num_angles):
+                distance = lidar_distance_list[i]
+                cos_ang = lidar_cos_angle_list[i]
+                sin_ang = lidar_sin_angle_list[i]
+                x = [distance * cos_ang, max_lidar_range * cos_ang]
+                y = [distance * sin_ang, max_lidar_range * sin_ang]
+                plt.plot(x, y, 'r')
+            plt.grid(True)
+            plt.xlim(-2, 2)
+            plt.ylim(-2, 2)
 
     # # Visualize localization
-    # def show_localization_plot():
-    #     with main_plot:
-    #         fig = main_plot.fig
-    #         fig.patch.set_facecolor('black')
-    #         plt.clf()
-    #         plt.style.use('dark_background')
-    #         plt.tick_params(axis='x', colors='lightgray')
-    #         plt.tick_params(axis='y', colors='lightgray')
+    def show_localization_plot():
+        with main_plot:
+            fig = main_plot.fig
+            fig.patch.set_facecolor('black')
+            plt.clf()
+            plt.style.use('dark_background')
+            plt.tick_params(axis='x', colors='lightgray')
+            plt.tick_params(axis='y', colors='lightgray')
 
-    #         pf = robot.particle_filter
-    #         state_mean = pf.particle_set.mean_state
-    #         particle_set = pf.particle_set
-    #         map_obj = pf.map
+            pf = robot.particle_filter
+            state_mean = pf.particle_set.mean_state
+            particle_set = pf.particle_set
+            map_obj = pf.map
 
-    #         # Plot map walls
-    #         for wall in map_obj.wall_list:
-    #             plt.plot(
-    #                 [wall.corner1.x, wall.corner2.x],
-    #                 [wall.corner1.y, wall.corner2.y],
-    #                 'w',
-    #                 linewidth=2
-    #             )
+            # Plot map walls
+            for wall in map_obj.wall_list:
+                plt.plot(
+                    [wall.corner1.x, wall.corner2.x],
+                    [wall.corner1.y, wall.corner2.y],
+                    'w',
+                    linewidth=2
+                )
 
-    #         # Plot particles
-    #         # x_particles = [p.state.x for p in particle_set.particle_list]
-    #         # y_particles = [p.state.y for p in particle_set.particle_list]
-    #         # plt.plot(x_particles, y_particles, 'g.', markersize=4)
+            # Plot particles
+            # x_particles = [p.state.x for p in particle_set.particle_list]
+            # y_particles = [p.state.y for p in particle_set.particle_list]
+            # plt.plot(x_particles, y_particles, 'g.', markersize=4)
 
-    #         # Plot estimated state
-    #         plt.plot(state_mean.x, state_mean.y, 'ro', markersize=8)
+            # Plot estimated state
+            plt.plot(state_mean.x, state_mean.y, 'ro', markersize=8)
 
-    #         # Plot heading arrow
-    #         dir_length = 0.15
-    #         plt.plot(
-    #             [state_mean.x, state_mean.x + dir_length * math.cos(state_mean.theta)],
-    #             [state_mean.y, state_mean.y + dir_length * math.sin(state_mean.theta)],
-    #             'r',
-    #             linewidth=2
-    #         )
+            # Plot heading arrow
+            dir_length = 0.15
+            plt.plot(
+                [state_mean.x, state_mean.x + dir_length * math.cos(state_mean.theta)],
+                [state_mean.y, state_mean.y + dir_length * math.sin(state_mean.theta)],
+                'r',
+                linewidth=2
+            )
 
-    #         # Confidence ellipse from all particles
-    #         x_particles_np = np.array([p.state.x for p in particle_set.particle_list])
-    #         y_particles_np = np.array([p.state.y for p in particle_set.particle_list])
+            # Confidence ellipse from all particles
+            x_particles_np = np.array([p.state.x for p in particle_set.particle_list])
+            y_particles_np = np.array([p.state.y for p in particle_set.particle_list])
 
-    #         if len(x_particles_np) > 1:
-    #             cov = np.cov(np.vstack((x_particles_np, y_particles_np)))
+            if len(x_particles_np) > 1:
+                cov = np.cov(np.vstack((x_particles_np, y_particles_np)))
 
-    #             if np.all(np.isfinite(cov)):
-    #                 eigvals, eigvecs = np.linalg.eig(cov)
-    #                 eigvals = np.maximum(eigvals, 1e-9)
+                if np.all(np.isfinite(cov)):
+                    eigvals, eigvecs = np.linalg.eig(cov)
+                    eigvals = np.maximum(eigvals, 1e-9)
 
-    #                 order = np.argsort(eigvals)[::-1]
-    #                 eigvals = eigvals[order]
-    #                 eigvecs = eigvecs[:, order]
+                    order = np.argsort(eigvals)[::-1]
+                    eigvals = eigvals[order]
+                    eigvecs = eigvecs[:, order]
 
-    #                 angle = math.degrees(math.atan2(eigvecs[1, 0], eigvecs[0, 0]))
+                    angle = math.degrees(math.atan2(eigvecs[1, 0], eigvecs[0, 0]))
 
-    #                 width = 4 * math.sqrt(eigvals[0])   # 2-sigma
-    #                 height = 4 * math.sqrt(eigvals[1])  # 2-sigma
+                    width = 4 * math.sqrt(eigvals[0])   # 2-sigma
+                    height = 4 * math.sqrt(eigvals[1])  # 2-sigma
 
-    #                 ellipse = Ellipse(
-    #                     (state_mean.x, state_mean.y),
-    #                     width=width,
-    #                     height=height,
-    #                     angle=angle,
-    #                     edgecolor='cyan',
-    #                     facecolor='none',
-    #                     linewidth=2
-    #                 )
-    #                 plt.gca().add_patch(ellipse)
+                    ellipse = Ellipse(
+                        (state_mean.x, state_mean.y),
+                        width=width,
+                        height=height,
+                        angle=angle,
+                        edgecolor='cyan',
+                        facecolor='none',
+                        linewidth=2
+                    )
+                    plt.gca().add_patch(ellipse)
 
-    #         plt.xlabel('X (m)')
-    #         plt.ylabel('Y (m)')
-    #         plt.axis(map_obj.plot_range)
-    #         plt.grid(True)
-    #         plt.gca().set_aspect('equal', adjustable='box')
+            plt.xlabel('X (m)')
+            plt.ylabel('Y (m)')
+            plt.axis(map_obj.plot_range)
+            plt.grid(True)
+            plt.gca().set_aspect('equal', adjustable='box')
 
-    #         # # Plot heading arrow
-    #         # dir_length = 0.15
-    #         # plt.plot(
-    #         #     [state_mean.x, state_mean.x + dir_length * math.cos(state_mean.theta)],
-    #         #     [state_mean.y, state_mean.y + dir_length * math.sin(state_mean.theta)],
-    #         #     'r',
-    #         #     linewidth=2
-    #         # )
+            # # Plot heading arrow
+            # dir_length = 0.15
+            # plt.plot(
+            #     [state_mean.x, state_mean.x + dir_length * math.cos(state_mean.theta)],
+            #     [state_mean.y, state_mean.y + dir_length * math.sin(state_mean.theta)],
+            #     'r',
+            #     linewidth=2
+            # )
 
-    #         # plt.xlabel('X (m)')
-    #         # plt.ylabel('Y (m)')
-    #         # plt.axis(map_obj.plot_range)
-    #         # plt.grid(True)
-    #         # plt.gca().set_aspect('equal', adjustable='box')
+            # plt.xlabel('X (m)')
+            # plt.ylabel('Y (m)')
+            # plt.axis(map_obj.plot_range)
+            # plt.grid(True)
+            # plt.gca().set_aspect('equal', adjustable='box')
 
     # ---- LEGACY CODE FOR TRIALS ----
     # # Run an experiment trial from a button push
@@ -435,31 +482,10 @@ def main():
                         'width:100%; max-height: 285px; object-fit:contain;')
                     video_image = None    
     
-    
-    # ----------------- LEGACY CODE FOR LIDAR, CAMERA, AND ENCODER UI -----------------
-    # # Create the video camera, lidar, and encoder sensor visualizations.
-    # with ui.card().classes('w-full'):
-    #     with ui.grid(columns=3).classes('w-full items-center'):
-    #         with ui.card().classes('w-full items-center h-60'):
-    #             if stream_video:
-    #                 video_image = ui.interactive_image('/video/frame').classes('w-full h-full')
-    #             else:
-    #                 ui.image('./a_robot_image.jpg').props('height=2')
-    #                 video_image = None
 
-    #         with ui.card().classes('w-full items-center h-60'):
-    #             main_plot = ui.pyplot(figsize=(3, 3))
-
-    #         with ui.card().classes('items-center h-60'):
-    #             ui.label('Encoder LEFT:').style('text-align: center;')
-    #             encoder_left_count_label = ui.label('0')
-    #             ui.label('Encoder RIGHT:').style('text-align: center;')
-    #             encoder_right_count_label = ui.label('0')
-    #             logging_switch = ui.switch('Data Logging ')
-    #             udp_switch = ui.switch('Robot Connect')
-
-    # Update slider values, plots, etc. and run robot control loop
+    # Main control loop
     ui.keyboard(on_key=update_commands)
+    draw_room()
     async def control_loop():
         update_connection_to_robot()
         
