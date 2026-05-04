@@ -114,6 +114,7 @@ class EKFLocalizer:
         )
         self._state.covariance = P_new
         self._state.source = "ekf_lidar"
+        
         return self.get_state()
 
     def get_state(self) -> PoseEstimate:
@@ -147,17 +148,6 @@ class EKFLocalizer:
         """Create zero covariance matrix."""
         return np.zeros((3, 3))
     
-    def correct_measurement(self, z_mm):
-        """
-        Given a raw LiDAR measurement z_mm,
-        return the bias-corrected measurement.
-
-        Uses linear interpolation between calibration points.
-        Clamps to the nearest known value outside the calibration range.
-        """
-        bias = float(np.interp(z_mm, parameters.LIDAR_CALIB_DIST, parameters.LIDAR_CALIB_BIAS))
-        
-        return z_mm - bias
     
     def adapt_covariance(self, z_mm):
         """

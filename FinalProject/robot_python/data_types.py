@@ -22,17 +22,17 @@ class Pose2D:
     y: float = 0.0
     theta: float = 0.0
 
-    def moved_by(self, motion: RelativeMotion) -> Pose2D:
-        """Apply a relative motion in the world frame."""
-        cos_t = math.cos(self.theta)
-        sin_t = math.sin(self.theta)
-        world_dx = cos_t * motion.dx - sin_t * motion.dy
-        world_dy = sin_t * motion.dx + cos_t * motion.dy
-        return Pose2D(
-            x=self.x + world_dx,
-            y=self.y + world_dy,
-            theta=normalize_angle(self.theta + motion.dtheta),
-        )
+    # def moved_by(self, motion: RelativeMotion) -> Pose2D:
+    #     """Apply a relative motion in the world frame."""
+    #     cos_t = math.cos(self.theta)
+    #     sin_t = math.sin(self.theta)
+    #     world_dx = cos_t * motion.dx - sin_t * motion.dy
+    #     world_dy = sin_t * motion.dx + cos_t * motion.dy
+    #     return Pose2D(
+    #         x=self.x + world_dx,
+    #         y=self.y + world_dy,
+    #         theta=normalize_angle(self.theta + motion.dtheta),
+    #     )
 
     def propagate_pose(self, motion: RelativeMotion) -> Pose2D:
         """Update pose in robot-local frame (no world transform)."""

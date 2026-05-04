@@ -9,6 +9,7 @@ import open3d as o3d
 
 from FinalProject.robot_python.config.config import FrontendConfig, RobotConfig
 from FinalProject.robot_python.data_types import LidarScan, Pose2D, RelativeMotion
+from FinalProject.robot_python.parameters import LIDAR_CALIB_BIAS, LIDAR_CALIB_DIST, LIDAR_COVARIANCE_FLOOR, C_LINEAR, B_LINEAR
 
 
 class LidarMatcher:
@@ -25,7 +26,12 @@ class LidarMatcher:
         step = max(1, self.frontend_config.lidar_downsample_step)
 
         for index in range(0, len(scan.ranges), step):
-            range_m = scan.ranges[index]
+
+            # Get a single measurement in mm, preprocess with bias, convert to m
+            range_mm = scan.ranges[index]
+            corrected_measurement = self.correct_measurement(range_mm)
+            range_m = corrected_measurement / 1000
+            
             if self.robot_config.lidar_min_range_m <= range_m <= self.robot_config.lidar_max_range_m:
                 valid_ranges.append(range_m)
                 valid_angles.append(scan.angles[index])
@@ -39,6 +45,18 @@ class LidarMatcher:
             frame_id=scan.frame_id,
             intensities=None,
         )
+    
+    def correct_measurement(self, z_mm):
+        """
+        Given a raw LiDAR measurement z_mm,
+        return the bias-corrected measurement.
+
+        Uses linear interpolation between calibration points.
+        Clamps to the nearest known value outside the calibration range.
+        """
+        bias = float(np.interp(z_mm, LIDAR_CALIB_DIST, LIDAR_CALIB_BIAS))
+        
+        return z_mm - bias
 
     def match_scans(
         self,

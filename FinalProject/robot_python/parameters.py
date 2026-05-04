@@ -26,6 +26,7 @@ dist_coeffs = np.array([ 0.08988576, -2.60316437, -0.02748353, 0.02115694, 13.16
 # Robot parameters
 num_robot_sensors = 2 # 2 encoders
 num_robot_control_signals = 2 # 2 encoders
+wheel_base = 0.215
 
 # Logging parameters
 max_num_lines_before_write = 1
