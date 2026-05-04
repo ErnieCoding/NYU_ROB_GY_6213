@@ -144,8 +144,12 @@ class LidarMatcher:
         # Reject clearly bad ICP matches. Returning zero motion is safer than
         # feeding an unreliable transform into the EKF and pose graph.
         if quality < min_fitness or rmse > max_rmse:
-            sigma = max(rmse, 1.0)
-            covariance = [[sigma, 0.0, 0.0], [0.0, sigma, 0.0], [0.0, 0.0, sigma]]
+            sigma = max(float(rmse), 0.5)
+            covariance = [
+                [sigma, 0.0, 0.0], 
+                [0.0, sigma, 0.0], 
+                [0.0, 0.0, 0.1]
+            ]
             return RelativeMotion(dx=0.0, dy=0.0, dtheta=0.0, covariance=covariance, quality=quality, source="lidar_icp")
 
         # Extract the 2D translation and yaw angle from the 4x4 ICP transform.
@@ -154,10 +158,18 @@ class LidarMatcher:
         dy = float(transform[1, 3])
         dtheta = math.atan2(float(transform[1, 0]), float(transform[0, 0]))
 
-        # Use RMSE as a simple placeholder uncertainty estimate.
-        # TODO: Calibrate this covariance from real scan-matching residuals.
-        sigma = max(rmse, 1e-3)
-        covariance = [[sigma, 0.0, 0.0], [0.0, sigma, 0.0], [0.0, 0.0, sigma]]
+        # TODO: Change implementation to the actual paper implementation with calculated residuals
+        mean_range_mm = float(np.mean(curr_scan.ranges)) * 1000.0 if curr_scan.ranges else 700.0
+        mean_range_m = mean_range_mm / 1000.0
+
+        sigma2_range = max(C_LINEAR * mean_range_mm + B_LINEAR, LIDAR_COVARIANCE_FLOOR)
+        sigma_xy = max(rmse, 1e-3) * (sigma2_range ** 0.5)
+        sigma_theta = sigma_xy / mean_range_m
+        covariance = [
+            [sigma_xy, 0.0, 0.0], 
+            [0.0, sigma_xy, 0.0], 
+            [0.0, 0.0, sigma_theta]
+        ]
 
         # Return the relative motion from current scan to previous scan,
         # along with ICP quality so later stages can gate weak matches.

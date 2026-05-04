@@ -18,7 +18,7 @@ import pygame
 
 # Local libraries
 import robot_code
-import parameters
+from FinalProject.robot_python import parameters
 
 # Global variables
 logging = False

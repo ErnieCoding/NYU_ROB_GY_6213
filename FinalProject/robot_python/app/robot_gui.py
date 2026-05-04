@@ -11,16 +11,57 @@ import time
 from fastapi import Response
 from time import time
 import pygame
+from __future__ import annotations
 
 # Local libraries
 import robot_code
-import parameters
+from FinalProject.robot_python import parameters
 
 # Global variables
 logging = False
 stream_video = True
 
 matplotlib.use('Agg')
+
+_all_map_x = ([p[0] for p in parameters.corners.values()]
+              + [p[0] for p in parameters.tags.values()])
+_all_map_y = ([p[1] for p in parameters.corners.values()]
+              + [p[1] for p in parameters.tags.values()])
+
+MAP_XLIM = (min(_all_map_x) - 20, max(_all_map_x) + 20)
+MAP_YLIM = (min(_all_map_y) - 20, max(_all_map_y) + 20)
+
+ROBOT_HALF_L = 13.5
+ROBOT_HALF_W = 11.0
+
+def init_slam_state(max_cloud_pts: int = 6000) -> dict:
+    """Return a fresh slam_state dict. Call once inside main()."""
+    return {
+        'cloud_x':       [],
+        'cloud_y':       [],
+        'traj_x':        [],
+        'traj_y':        [],
+        'slam_traj_x':   [],
+        'slam_traj_y':   [],
+        'pose_x':        0.0,
+        'pose_y':        0.0,
+        'pose_theta':    0.0,
+        'covariance':    None,
+        'max_cloud_pts': max_cloud_pts,
+    }
+
+def _robot_rect_world(rx: float, ry: float, theta: float):
+    c, s = math.cos(theta), math.sin(theta)
+    local = [
+        ( ROBOT_HALF_L,  ROBOT_HALF_W),
+        ( ROBOT_HALF_L, -ROBOT_HALF_W),
+        (-ROBOT_HALF_L, -ROBOT_HALF_W),
+        (-ROBOT_HALF_L,  ROBOT_HALF_W),
+        ( ROBOT_HALF_L,  ROBOT_HALF_W),
+    ]
+    xs = [rx + c * lx - s * ly for lx, ly in local]
+    ys = [ry + s * lx + c * ly for lx, ly in local]
+    return xs, ys
 
 
 # Frame converter for the video stream, from OpenCV to a JPEG image

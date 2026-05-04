@@ -64,7 +64,7 @@ class EKFLocalizer:
             -1.0 / parameters.wheel_base,
             1.0 / parameters.wheel_base,
         ]
-    ])
+        ])
 
         # Compute jacobian G with resepct to previous pose
 
@@ -161,15 +161,3 @@ class EKFLocalizer:
     def _zero_covariance(self) -> np.ndarray:
         """Create zero covariance matrix."""
         return np.zeros((3, 3))
-    
-    
-    def adapt_covariance(self, z_mm):
-        """
-        Returns measurement noise variance R (mm²)
-        using the linear model: R = c·z + b
-        z_mm: raw LiDAR reading in millimeters
-        """
-        
-        R = parameters.C_LINEAR * z_mm + parameters.B_LINEAR
-        
-        return max(R, parameters.LIDAR_COVARIANCE_FLOOR)

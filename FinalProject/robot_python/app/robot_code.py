@@ -12,7 +12,7 @@ from time import strftime
 import threading
 
 # Parameters
-import parameters
+from FinalProject.robot_python import parameters
 
 
 # ---- MAIN ROBOT CLASS ---- 
@@ -30,6 +30,7 @@ class Robot:
         self.robot_sensor_signal = RobotSensorSignal([0, 0, 0])
         self.camera_sensor_signal = [0,0,0,0,0,0]
         # TODO: ADD FILTER
+        
         
     # Create udp senders and receiver instances with the udp communication
     def setup_udp_connection(self, udp_communication):
