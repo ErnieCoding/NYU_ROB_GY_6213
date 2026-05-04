@@ -14,8 +14,8 @@ from fitting_data import b, files_and_data
 # -----------------------------
 # FITTED ENCODER FUNCTIONS
 # -----------------------------
-k_L=0.00035210144602487893
-k_R=0.0003565082979875711
+k_L=0.00035698051573807086
+k_R=0.0003658445193934484
 
 cm_to_m = 0.01
 
@@ -143,10 +143,10 @@ def run_one_file(filename):
         # print(f"Measured center displacement: {s_center_true:.4f} m")
         # theta0_deg = trial_info["theta_start"]
 
-    theta0_deg = trial_info["theta_start"]
-    theta0_rad = compass_to_robot_global_theta(trial_info["theta_start"])
+    theta0_deg =0  #trial_info["theta_start"]
+    theta0_rad = compass_to_robot_global_theta(theta0_deg)
 
-    print(f"Compass theta_start: {trial_info['theta_start']} deg")
+    # print(f"Compass theta_start: {trial_info['theta_start']} deg")
     print(f"Robot global theta_start: {np.rad2deg(theta0_rad):.2f} deg")
     x_pred, y_pred, theta_pred = predict_trajectory_from_wheels(
         sL_pred_list,
@@ -201,5 +201,5 @@ def run_one_file(filename):
 # -----------------------------
 # CHOOSE FILE HERE
 # -----------------------------
-filename_to_run = "../../data/robot_data_0_0_03_05_26_13_21_47.pkl"
+filename_to_run = "C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\trial runs\\t0-t5\\robot_data_0_0_04_05_26_02_55_52.pkl"
 run_one_file(filename_to_run)

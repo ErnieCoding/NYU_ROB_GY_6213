@@ -157,12 +157,12 @@
 // ===========================
 // Router WiFi Credentials
 // ===========================
-// const char *ssid = "Tenda_7F76C0";
-// const char *password = "24449038";
+const char *ssid = "Tenda_7F76C0";
+const char *password = "24449038";
 
 
-const char *ssid = "Tenda_9C9E80";
-const char *password = "42232674";
+// const char *ssid = "Tenda_9C9E80";
+// const char *password = "42232674";
 
 
 void startCameraServer();

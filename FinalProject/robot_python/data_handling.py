@@ -5,7 +5,7 @@ import math
 import numpy as np
 
 # Internal Libraries
-import parameters
+import FinalProject.robot_python.parameters as parameters
 import robot_code
 # import motion_models
 

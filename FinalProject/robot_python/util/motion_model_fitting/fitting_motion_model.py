@@ -206,6 +206,9 @@ def fitting_motion_model(files_and_data):
     print("Mean Variance Right:", np.mean(err_R**2))
     r2_L = compute_r2(sL, sL_pred)
     r2_R = compute_r2(sR, sR_pred)
+    #print computed R2
+    print("R² Left:", r2_L)
+    print("R² Right:", r2_R)
 
     print("\nR² (Encoder → Distance):")
     print(f"Left wheel R²:  {r2_L:.4f}")
@@ -367,7 +370,18 @@ if __name__ == "__main__":
     
 
 
-# ##FINAL EQUATIONS:
+# ##FINAL EQUATIONS: BEFORE ADDING NEW DATA
+# Left wheel R²:  0.9918
+# Right wheel R²: 0.9907
+# s_L = 0.00035210 * Δe_L
+# s_R = 0.00035651 * Δe_R
+
+# Quadratic variance functions:
+# sigma_L^2 = 0.00047296*|s_L_pred|^2 + 0.00428335*|s_L_pred| + 0.00742903
+# sigma_R^2 = 0.00679702*|s_R_pred|^2 + -0.01167738*|s_R_pred| + 0.00900622
+
+##AFTER ADDING NEW DATA
+# ##FINAL EQUATIONS: BEFORE ADDING NEW DATA
 # Left wheel R²:  0.9918
 # Right wheel R²: 0.9907
 # s_L = 0.00035210 * Δe_L

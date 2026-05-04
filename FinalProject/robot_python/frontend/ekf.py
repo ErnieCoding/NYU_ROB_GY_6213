@@ -11,7 +11,7 @@ from FinalProject.robot_python.data_types import EncoderState, Pose2D, PoseEstim
 from FinalProject.robot_python.frontend.motion_model import DifferentialDriveMotionModel
 from FinalProject.robot_python.data_types import normalize_angle
 
-import parameters
+from FinalProject.robot_python import parameters
 
 class EKFLocalizer:
     """Maintain a local pose estimate with EKF predict/correct steps."""
@@ -34,7 +34,7 @@ class EKFLocalizer:
         """Run the EKF prediction step using wheel odometry."""
 
         # 1. Get motion increment
-        motion = self.motion_model.RelativeMotion_change(prev_encoder, curr_encoder)
+        motion,delta_s = self.motion_model.RelativeMotion_change(prev_encoder, curr_encoder)
         self.last_odom_motion = motion
 
         # 2. Update pose:
@@ -42,21 +42,35 @@ class EKFLocalizer:
         self._prev_pose = prev_pose
         new_pose = prev_pose.propagate_pose(motion)
 
-        # 3. Compute Jacobian F
-        distance = motion.delta_distance
-
+        # 3. Compute Jacobian F with respect to previous pose
         theta = prev_pose.theta
-        theta_mid = theta + 0.5 * motion.dtheta
+        theta_m = theta + 0.5 * motion.dtheta
 
         F = np.array([
-            [1.0, 0.0, -distance * math.sin(theta_mid)],
-            [0.0, 1.0,  distance * math.cos(theta_mid)],
+            [1.0, 0.0, -delta_s * math.sin(theta_m)],
+            [0.0, 1.0,  delta_s * math.cos(theta_m)],
             [0.0, 0.0,  1.0],
         ])
 
+        G = np.array([
+            [0.5 * np.cos(theta_m) + (delta_s / (2*parameters.wheel_base)) * np.sin(theta_m),
+            0.5 * np.cos(theta_m) - (delta_s / (2*parameters.wheel_base)) * np.sin(theta_m),
+        ],
+        [
+            0.5 * np.sin(theta_m) - (delta_s / (2 * parameters.wheel_base)) * np.cos(theta_m),
+            0.5 * np.sin(theta_m) + (delta_s / (2 * parameters.wheel_base)) * np.cos(theta_m),
+        ],
+        [
+            -1.0 / parameters.wheel_base,
+            1.0 / parameters.wheel_base,
+        ]
+    ])
+
+        # Compute jacobian G with resepct to previous pose
+
         # 4. Covariance propagation
         P_prev = self._state.covariance
-        Q = motion.covariance if motion.covariance is not None else self._zero_covariance()
+        Q = Q = G @ motion.covariance @ G.T
 
         P_new = F @ P_prev @ F.T + Q
 
