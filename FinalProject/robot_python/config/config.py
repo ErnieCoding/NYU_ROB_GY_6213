@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 
 from FinalProject.robot_python.data_types import Pose2D
 
+import math
+
 
 @dataclass
 class RobotConfig:
@@ -17,6 +19,8 @@ class RobotConfig:
     # meters_per_tick: float = 0.0005
     lidar_min_range_m: float = 0.05
     lidar_max_range_m: float = 12.0
+
+    lidar_yaw_offset_rad = 0.0
 
 
 @dataclass
@@ -63,6 +67,27 @@ class FrontendConfig:
     keyframe_translation_m: float = 0.05 # add keyframe every 5 cm
     keyframe_rotation_rad: float = 0.0872665 # add keyframe every 5 degrees
     max_landmark_keyframe_time_diff_s: float = 0.15
+
+    lidar_frontend_decimation = 3
+    lidar_min_translation_for_match_m = 0.03
+    lidar_min_rotation_for_match_rad = math.radians(2.0)
+    lidar_frontend_accept_quality = 0.35
+    lidar_keyframe_factor_min_quality = 0.45
+    submap_update_decimation = 2
+
+    lidar_downsample_step = 3
+    submap_max_scans = 5
+    submap_max_points = 1000
+    match_max_query_points = 160
+    match_max_reference_points = 900
+
+    submap_search_translation_window_m = 0.05
+    submap_search_translation_step_m = 0.02
+    submap_coarse_translation_step_m = 0.04
+    submap_search_rotation_window_rad = math.radians(4.0)
+    submap_search_rotation_step_rad = math.radians(1.0)
+    submap_coarse_rotation_step_rad = math.radians(2.0)
+    submap_min_match_quality = 0.20
 
 
 @dataclass

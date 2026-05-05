@@ -64,6 +64,10 @@ class EKFLocalizer:
         if self.last_odom_motion is None:
             self._state.source = "ekf_lidar_no_previous_pose"
             return self.get_state()
+        
+        # if self.last_odom_motion is None or self._prev_pose is None:
+        #     self._state.source = "ekf_lidar_no_previous_pose"
+        #     return self.get_state()
 
         predicted_pose = self._state.pose
         prev_pose = self._prev_pose

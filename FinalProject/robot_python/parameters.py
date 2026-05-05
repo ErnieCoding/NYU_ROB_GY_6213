@@ -12,7 +12,7 @@ localIP = "192.168.0.196" # LAPTOP'S IP on wifi router Tenda_7F76C0
 # localIP = "192.168.0.199" # LAPTOP'S IP ON WIFI ROUTER Tenda_9C9E80
 
 # arduinoIP = "192.168.4.3" # ARDUINO'S IP ON ESP32-CAM
-arduinoIP = "192.168.0.198" # ARDUINO'S IP ON WIFI ROUTER Tenda_7F76C0
+arduinoIP = "192.168.0.199" # ARDUINO'S IP ON WIFI ROUTER Tenda_7F76C0
 # arduinoIP = "192.168.0.198" # ARDUINO'S IP ON WIFI ROUTER Tenda_9C9E80
 localPort = 4010
 arduinoPort = 4010
@@ -23,7 +23,7 @@ bufferSize = 1024
 # ------------------
 # Camera parameters
 # ------------------
-camera_url = "http://192.168.0.199:81/stream" # CAMERA'S IP ON THE WIFI ROUTER
+camera_url = "http://192.168.0.200:81/stream" # CAMERA'S IP ON THE WIFI ROUTER
 # camera_url = "http://192.168.0.195:81/stream" # CAMERA'S IP ON ESP32-CAM
 marker_length = 0.095
 camera_matrix = np.array([[ 348.0321225, 0, 188.28539766 ],
@@ -36,8 +36,8 @@ dist_coeffs = np.array([ 0.08988576, -2.60316437, -0.02748353, 0.02115694, 13.16
 # ------------------
 # Robot parameters
 # ------------------
-num_robot_sensors = 2 # 2 encoders
-num_robot_control_signals = 2 # 2 encoders
+num_robot_sensors = 2 
+num_robot_control_signals = 2
 wheel_base = 0.215
 
 

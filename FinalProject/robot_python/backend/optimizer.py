@@ -1,91 +1,130 @@
-"""Placeholder graph optimizer interface for future GTSAM or solver integration."""
+"""Graph optimizer using GTSAM Pose2 factors."""
 
 from __future__ import annotations
 
-from FinalProject.robot_python.backend.pose_graph import PoseGraphManager
-from FinalProject.robot_python.config.config import BackendConfig
-from FinalProject.robot_python.data_types import Pose2D
+import math
 import gtsam
 import numpy as np
 
-class GraphOptimizer:
-    """Optimize the pose graph and expose optimized poses."""
+from FinalProject.robot_python.backend.pose_graph import PoseGraphManager
+from FinalProject.robot_python.config.config import BackendConfig
+from FinalProject.robot_python.data_types import Pose2D, normalize_angle
 
+
+class GraphOptimizer:
     def __init__(self, config: BackendConfig) -> None:
         self.config = config
 
     def optimize(self, graph_manager: PoseGraphManager) -> dict[int, Pose2D]:
-        """Run graph optimization and return optimized trajectory by node id."""
-        
+        if not graph_manager.nodes:
+            return {}
 
         def pose2_from_pose(pose: Pose2D) -> gtsam.Pose2:
-            """Convert the project Pose2D type into a GTSAM Pose2."""
             return gtsam.Pose2(float(pose.x), float(pose.y), float(pose.theta))
 
-        def covariance_noise(covariance) -> gtsam.noiseModel.Gaussian:
-            """Convert a 3x3 covariance into a GTSAM Gaussian noise model."""
+        def covariance_noise(covariance) -> gtsam.noiseModel.Base:
             if covariance is None:
-                covariance = np.eye(3)
+                covariance = np.diag([0.10**2, 0.10**2, math.radians(8.0) ** 2])
             covariance = np.asarray(covariance, dtype=float)
+            covariance = 0.5 * (covariance + covariance.T)
+            covariance += 1e-9 * np.eye(covariance.shape[0])
             return gtsam.noiseModel.Gaussian.Covariance(covariance)
+
+        def robust_noise(covariance, huber_k: float = 1.345) -> gtsam.noiseModel.Base:
+            base = covariance_noise(covariance)
+            return gtsam.noiseModel.Robust.Create(
+                gtsam.noiseModel.mEstimator.Huber(huber_k),
+                base,
+            )
 
         graph = gtsam.NonlinearFactorGraph()
         initial = gtsam.Values()
 
-        # Insert all keyframe poses as initial estimates.
         for node_id, node in graph_manager.nodes.items():
             initial.insert(node_id, pose2_from_pose(node.pose.pose))
 
-        if not graph_manager.nodes:
-            return {}
-
-        # Anchor the first node so the graph has a fixed global reference.
         first_node_id = min(graph_manager.nodes)
         first_pose = graph_manager.nodes[first_node_id].pose.pose
-        prior_noise = gtsam.noiseModel.Gaussian.Covariance(np.diag([1e-6, 1e-6, 1e-6]))
+        prior_noise = gtsam.noiseModel.Diagonal.Sigmas(
+            np.array([1e-3, 1e-3, math.radians(0.1)], dtype=float)
+        )
         graph.add(gtsam.PriorFactorPose2(first_node_id, pose2_from_pose(first_pose), prior_noise))
 
-        # Convert stored project factors into GTSAM Pose2 factors.
         for factor in graph_manager.factors:
-            if factor.factor_type in {"odometry", "lidar", "loop_closure"}:
+            if factor.factor_type in {"odometry", "lidar"}:
                 if len(factor.node_ids) != 2:
                     continue
                 i, j = factor.node_ids
-                measurement = factor.measurement
-                relative_pose = gtsam.Pose2(
-                    float(measurement.dx),
-                    float(measurement.dy),
-                    float(measurement.dtheta),
-                )
-                noise = covariance_noise(measurement.covariance)
-                graph.add(gtsam.BetweenFactorPose2(i, j, relative_pose, noise))
+                m = factor.measurement
+                z = gtsam.Pose2(float(m.dx), float(m.dy), float(m.dtheta))
+                graph.add(gtsam.BetweenFactorPose2(i, j, z, covariance_noise(m.covariance)))
+
+            elif factor.factor_type == "loop_closure":
+                if len(factor.node_ids) != 2:
+                    continue
+                i, j = factor.node_ids
+                m = factor.measurement
+                z = gtsam.Pose2(float(m.dx), float(m.dy), float(m.dtheta))
+                graph.add(gtsam.BetweenFactorPose2(i, j, z, robust_noise(m.covariance)))
 
             elif factor.factor_type == "landmark":
                 if len(factor.node_ids) != 1:
                     continue
                 node_id = factor.node_ids[0]
-                observation = factor.measurement
-                pose_measurement = pose2_from_pose(observation.robot_pose_meas)
-                noise = covariance_noise(observation.covariance)
-                graph.add(gtsam.PriorFactorPose2(node_id, pose_measurement, noise))
+                obs = factor.measurement
+                z = pose2_from_pose(obs.robot_pose_meas)
+                graph.add(gtsam.PriorFactorPose2(node_id, z, covariance_noise(obs.covariance)))
 
-        optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial)
+        num_nodes = len(graph_manager.nodes)
+        num_factors = len(graph_manager.factors)
+        factor_summary = graph_manager.get_graph_summary()
+
+        initial_error = None
+        if hasattr(graph, "error"):
+            try:
+                initial_error = float(graph.error(initial))
+            except Exception as exc:
+                print(f"[OPTIMIZER][WARN] failed to compute initial error: {exc}")
+
+        print(
+            f"[OPTIMIZER][GRAPH] nodes={num_nodes} factors={num_factors} "
+            f"summary={factor_summary}"
+        )
+        if initial_error is not None:
+            print(f"[OPTIMIZER][ERROR] initial={initial_error:.6f}")
+        
+        params = gtsam.LevenbergMarquardtParams()
+        params.setVerbosityLM("SILENT")
+        params.setMaxIterations(int(getattr(self.config, "max_iterations", 100)))
+        optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial, params)
         result = optimizer.optimize()
 
-        # Convert optimized GTSAM poses back into project Pose2D values.
+        final_error = None
+        if hasattr(graph, "error"):
+            try:
+                final_error = float(graph.error(result))
+            except Exception as exc:
+                print(f"[OPTIMIZER][WARN] failed to compute final error: {exc}")
+
+        if initial_error is not None and final_error is not None:
+            print(
+                f"[OPTIMIZER][ERROR] final={final_error:.6f} "
+                f"delta={initial_error - final_error:.6f}"
+            )
+        
+        
         optimized_poses: dict[int, Pose2D] = {}
         for node_id in graph_manager.nodes:
             pose = result.atPose2(node_id)
             optimized_poses[node_id] = Pose2D(
                 x=float(pose.x()),
                 y=float(pose.y()),
-                theta=float(pose.theta()),
+                theta=normalize_angle(float(pose.theta())),
             )
 
         return optimized_poses
 
     def should_optimize(self, num_new_keyframes: int, elapsed_time: float | None = None) -> bool:
-        """Decide whether optimization should run."""
         if num_new_keyframes >= self.config.optimize_every_n_keyframes:
             return True
         if elapsed_time is not None and elapsed_time >= self.config.optimize_every_seconds:

@@ -294,9 +294,9 @@ def main():
     key_state = {'up': False, 'left': False, 'right': False, 'down': False}
     ctrl = {'joystick': None}
 
-    BASE_SPEED = 65
-    SPIN_SPEED = 55
-    TURN_OFFSET = 30
+    BASE_SPEED = 40
+    SPIN_SPEED = 30
+    TURN_OFFSET = 35
 
     # Determine what speed to send to each motor
     def update_commands(e: events.KeyEventArguments):

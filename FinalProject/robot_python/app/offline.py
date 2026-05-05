@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
+
 _APP_DIR = Path(__file__).resolve().parent
 _PYTHON_DIR = _APP_DIR.parent
 _PROJECT_DIR = _PYTHON_DIR.parent
@@ -20,6 +21,9 @@ for _p in [str(_ROOT_DIR), str(_PROJECT_DIR), str(_PYTHON_DIR), str(_APP_DIR)]:
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+def normalize_angle(angle: float) -> float:
+    """Normalize an angle in radians to the interval [-pi, pi)."""
+    return (angle + math.pi) % (2.0 * math.pi) - math.pi
 
 def install_optional_slam_stubs() -> None:
     """Keep offline replay usable when optional solver packages are absent."""
@@ -158,7 +162,7 @@ class OfflineRunner:
             timestamp = float(time_list[index])
             robot_signal = robot_signal_list[index]
             robot_frame = self._robot_frame_from_logged_signal(robot_signal, timestamp)
-            self.slam.run_frontend(robot_frame)
+            front_output = self.slam.run_frontend(robot_frame)
 
             if index < len(camera_detection_list):
                 for obs in self._landmark_observations_from_camera_rows(
@@ -167,7 +171,7 @@ class OfflineRunner:
                 ):
                     self.slam.add_landmark_observation(obs)
 
-            if self.run_backend_enabled:
+            if self.run_backend_enabled and front_output.created_keyframe:
                 self.slam.run_backend()
 
             if self.replay_delay_s > 0.0:
@@ -175,6 +179,24 @@ class OfflineRunner:
 
         if self.run_backend_enabled:
             self._force_backend_once()
+        
+        summary = self.slam.pose_graph.get_graph_summary()
+        print("\n========== OFFLINE RUN SUMMARY ==========")
+        print(f"log: {self.log_pickle_path}")
+        print(f"graph summary: {summary}")
+        print(f"keyframes: {self.slam._debug_keyframe_count}")
+        print(
+            "landmarks: "
+            f"accepted={self.slam._debug_landmark_accept_count}, "
+            f"rejected={self.slam._debug_landmark_reject_count}"
+        )
+        print(
+            "loop closures: "
+            f"attempted={self.slam._debug_loop_attempt_count}, "
+            f"accepted={self.slam._debug_loop_accept_count}, "
+            f"rejected={self.slam._debug_loop_reject_count}"
+        )
+        print("========================================\n")
 
     def plot(self, output_path: str | Path | None = None, show: bool = True) -> None:
         """Plot room geometry, SLAM trajectory, and live/optimized map points."""
@@ -315,11 +337,47 @@ class OfflineRunner:
         dx_robot_m = z_cm / 100.0
         dy_robot_m = -x_cm / 100.0
 
-        robot_pose = Pose2D(
-            x=marker_x_m - dx_robot_m,
-            y=marker_y_m - dy_robot_m,
-            theta=-yaw_rad,
+        print(
+            f"[LANDMARK_RAW] marker={marker_id} "
+            f"tag_map=({marker_x_m:.3f}, {marker_y_m:.3f}) "
+            f"cam_row=(x_cm={x_cm:.3f}, z_cm={z_cm:.3f}, yaw_deg={float(pose_row[4]):.3f}) "
+            f"robot_rel=(dx={dx_robot_m:.3f}, dy={dy_robot_m:.3f}) "
+            f"yaw_raw_rad={yaw_rad:.3f}"
         )
+
+        yaw_a = normalize_angle(-yaw_rad)
+        yaw_b = normalize_angle(yaw_rad)
+        yaw_c = normalize_angle(math.pi - yaw_rad)
+
+        print(
+            f"[LANDMARK_YAW_TEST] marker={marker_id} "
+            f"yaw_a_neg={yaw_a:.3f} "
+            f"yaw_b_pos={yaw_b:.3f} "
+            f"yaw_c_pi_minus={yaw_c:.3f}"
+        )
+
+        cand1_x = marker_x_m - dx_robot_m
+        cand1_y = marker_y_m - dy_robot_m
+        cand2_x = marker_x_m + dx_robot_m
+        cand2_y = marker_y_m + dy_robot_m
+
+        print(
+            f"[LANDMARK_POS_TEST] marker={marker_id} "
+            f"cand1_minus=({cand1_x:.3f}, {cand1_y:.3f}) "
+            f"cand2_plus=({cand2_x:.3f}, {cand2_y:.3f})"
+        )
+
+        robot_pose = Pose2D(
+            x=marker_x_m + dx_robot_m,
+            y=marker_y_m - dy_robot_m,
+            theta=normalize_angle(math.pi - yaw_rad),
+        )
+
+        print(
+            f"[LANDMARK_POSE_TEST] marker={marker_id} "
+            f"robot_pose_test=({robot_pose.x:.3f}, {robot_pose.y:.3f}, {robot_pose.theta:.3f})"
+        )
+
         covariance = self._camera_covariance_from_pose_row(pose_row)
         return LandmarkObservation(
             timestamp=timestamp,
@@ -356,7 +414,7 @@ def _latest_pickle() -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a DataLogger pickle through SLAM offline.")
-    parser.add_argument("log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\robot_data_0_0_04_05_26_22_32_50.pkl")
+    parser.add_argument("log_pickle", nargs="?", type=Path, default="/home/ernest/Desktop/NYU_ROB_GY_6213/FinalProject/robot_python/data/trial runs/t0-t12/robot_data_0_0_04_05_26_02_59_22.pkl")
     parser.add_argument("--output", type=Path, default=_PYTHON_DIR / "offline_slam_plot.png")
     parser.add_argument("--no-show", action="store_true")
     parser.add_argument("--no-backend", action="store_true")

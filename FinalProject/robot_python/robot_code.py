@@ -497,5 +497,3 @@ class RobotSensorSignal:
     # Put lidar distances in the correct units.
     def convert_hardware_distance(self, distance):
         return distance / 1000 # mm to m
-    
-
