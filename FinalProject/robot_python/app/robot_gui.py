@@ -26,7 +26,8 @@ for _p in [str(_ROOT_DIR), str(_PROJECT_DIR), str(_PYTHON_DIR), str(_APP_DIR)]:
         sys.path.insert(0, _p)
 
 # Local libraries
-import FinalProject.robot_python.robot_code as robot_code
+# import FinalProject.robot_python.robot_code as robot_code
+import robot_code
 from FinalProject.robot_python import parameters
 
 # Global variables
@@ -236,6 +237,7 @@ def main():
         'pose_theta':    0.0,
         'covariance':    None,
         'max_cloud_pts': 6000,
+        '_plot_tick': 0,
     }
 
     # Lidar data
@@ -398,6 +400,171 @@ def main():
             if robot.connected_to_hardware:
                 robot.eliminate_udp_connection()
                 robot.connected_to_hardware = False
+
+
+    # ---- LEGACY CODE FOR TRIALS ----
+    # # Run an experiment trial from a button push
+    # def run_trial():
+    #     if not udp_switch.value:
+    #         print("Please connect to robot first.")
+    #         return
+
+    #     robot.trial_start_time = get_time_in_ms()
+    #     robot.running_trial = True
+    #     robot.extra_logging = False
+    #     logging_switch.value = True
+
+    #     # Optional: manual switches off during scripted run
+    #     speed_switch.value = False
+    #     steering_switch.value = False
+
+    #     print("Start time:", robot.trial_start_time)
+
+    
+    with ui.row().classes('w-full h-full gap-2 no-wrap'):
+
+        # ── LEFT COLUMN ─────────────────────────────────────────────
+        with ui.column().classes('w-64 gap-2 flex-shrink-0'):
+
+            # Arrow key widget
+            with ui.card().classes('w-full items-center'):
+                ui.label('KEYBOARD').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
+                ui.html("""
+                <div class="arrow-keys-widget">
+                    <div class="key-row">
+                        <div id="key-up" class="key">↑</div>
+                    </div>
+                    <div class="key-row">
+                        <div id="key-left"  class="key">←</div>
+                        <div id="key-down"  class="key">↓</div>
+                        <div id="key-right" class="key">→</div>
+                    </div>
+                </div>
+                """, sanitize=False)
+
+            # Switches
+            with ui.card().classes('w-full'):
+                controller_switch = ui.switch('Controller', on_change=on_controller_switch)
+                logging_switch    = ui.switch('Data Logging')
+                udp_switch        = ui.switch('Robot Connect')
+
+            # Encoder counts
+            with ui.card().classes('w-full'):
+                ui.label('ENCODERS').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
+                with ui.row().classes('w-full items-center justify-between'):
+                    ui.label('Left')
+                    encoder_left_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
+                with ui.row().classes('w-full items-center justify-between'):
+                    ui.label('Right')
+                    encoder_right_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
+            
+            # After the encoder card, inside the left column:
+
+            # ── PIPELINE MODE SWITCH ──────────────────────────────────
+            with ui.card().classes('w-full'):
+                ui.label('PIPELINE').style(
+                    'font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;'
+                )
+                backend_switch = ui.switch(
+                    'Frontend + Backend',
+                    value=False,
+                ).tooltip('OFF = EKF frontend only  |  ON = EKF + graph optimizer')
+
+            # ── POSE ESTIMATES ────────────────────────────────────────
+            with ui.card().classes('w-full'):
+                ui.label('POSE ESTIMATE').style(
+                    'font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;'
+                )
+
+            # --- Global frame (EKF frontend) ---
+            ui.label('EKF Frontend (global)').style('font-size:10px; color:#888; margin-top:4px;')
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('x (m)')
+                ekf_x_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('y (m)')
+                ekf_y_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('θ (°)')
+                ekf_theta_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('σ_x (m)')
+                ekf_sx_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#888;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('σ_y (m)')
+                ekf_sy_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#888;'
+                )
+
+            # --- Backend (graph-optimized) ---
+            ui.label('Graph Backend (global)').style('font-size:10px; color:#888; margin-top:8px;')
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('x (m)')
+                opt_x_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('y (m)')
+                opt_y_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('θ (°)')
+                opt_theta_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
+                )
+
+            # --- Robot frame (velocity-domain, EKF-derived) ---
+            ui.label('Robot frame (local velocity)').style('font-size:10px; color:#888; margin-top:8px;')
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('v_x (m/s)')
+                rf_vx_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('v_y (m/s)')
+                rf_vy_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
+                )
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('ω (°/s)')
+                rf_omega_label = ui.label('—').style(
+                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
+                )
+
+        CAMERA_W = 400
+        CAMERA_H = 296
+        # ── RIGHT COLUMN (plots + camera) ───────────────────────────
+        with ui.column().classes('flex-1 gap-2 overflow-hidden'):
+
+            # Plot — top half
+            with ui.card().classes('w-full items-center'):
+                ui.label('LiDAR / Localization').style('font-weight:600;')
+                main_plot = ui.pyplot(figsize=(10, 4))  # wider, shorter
+
+            # Camera — bottom half
+            with ui.card().classes('w-full overflow-hidden items-center'):
+                ui.label('Camera').style('font-weight:600;')
+                if stream_video:
+                    video_image = ui.interactive_image('/video/frame').style(
+                        f"width:{CAMERA_W}px;"
+                        f"height:{CAMERA_H}px;"
+                        f"object-fit:contain;"
+                        f"display:block;"
+                    )
+                else:
+                    ui.image('./robot_image.jpg').style(
+                        'width:100%; max-height: 285px; object-fit:contain;')
+                    video_image = None    
+    
 
     # TODO: Visualize LiDAR with a different library specifically for LiDAR
     # Visualize the lidar scans
@@ -663,239 +830,105 @@ def main():
             ax.set_xlim(*MAP_XLIM)
             ax.set_ylim(*MAP_YLIM)
             main_plot.update()
-
-    # ---- LEGACY CODE FOR TRIALS ----
-    # # Run an experiment trial from a button push
-    # def run_trial():
-    #     if not udp_switch.value:
-    #         print("Please connect to robot first.")
-    #         return
-
-    #     robot.trial_start_time = get_time_in_ms()
-    #     robot.running_trial = True
-    #     robot.extra_logging = False
-    #     logging_switch.value = True
-
-    #     # Optional: manual switches off during scripted run
-    #     speed_switch.value = False
-    #     steering_switch.value = False
-
-    #     print("Start time:", robot.trial_start_time)
-
     
-    with ui.row().classes('w-full h-full gap-2 no-wrap'):
-
-        # ── LEFT COLUMN ─────────────────────────────────────────────
-        with ui.column().classes('w-64 gap-2 flex-shrink-0'):
-
-            # Arrow key widget
-            with ui.card().classes('w-full items-center'):
-                ui.label('KEYBOARD').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
-                ui.html("""
-                <div class="arrow-keys-widget">
-                    <div class="key-row">
-                        <div id="key-up" class="key">↑</div>
-                    </div>
-                    <div class="key-row">
-                        <div id="key-left"  class="key">←</div>
-                        <div id="key-down"  class="key">↓</div>
-                        <div id="key-right" class="key">→</div>
-                    </div>
-                </div>
-                """, sanitize=False)
-
-            # Switches
-            with ui.card().classes('w-full'):
-                controller_switch = ui.switch('Controller', on_change=on_controller_switch)
-                logging_switch    = ui.switch('Data Logging')
-                udp_switch        = ui.switch('Robot Connect')
-
-            # Encoder counts
-            with ui.card().classes('w-full'):
-                ui.label('ENCODERS').style('font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;')
-                with ui.row().classes('w-full items-center justify-between'):
-                    ui.label('Left')
-                    encoder_left_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
-                with ui.row().classes('w-full items-center justify-between'):
-                    ui.label('Right')
-                    encoder_right_count_label = ui.label('0').style('font-variant-numeric:tabular-nums;')
-            
-            # After the encoder card, inside the left column:
-
-            # ── PIPELINE MODE SWITCH ──────────────────────────────────
-            with ui.card().classes('w-full'):
-                ui.label('PIPELINE').style(
-                    'font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;'
-                )
-                backend_switch = ui.switch(
-                    'Frontend + Backend',
-                    value=False,
-                ).tooltip('OFF = EKF frontend only  |  ON = EKF + graph optimizer')
-
-            # ── POSE ESTIMATES ────────────────────────────────────────
-            with ui.card().classes('w-full'):
-                ui.label('POSE ESTIMATE').style(
-                    'font-size:11px; font-weight:600; letter-spacing:0.1em; color:#666;'
-                )
-
-            # --- Global frame (EKF frontend) ---
-            ui.label('EKF Frontend (global)').style('font-size:10px; color:#888; margin-top:4px;')
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('x (m)')
-                ekf_x_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('y (m)')
-                ekf_y_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('θ (°)')
-                ekf_theta_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('σ_x (m)')
-                ekf_sx_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#888;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('σ_y (m)')
-                ekf_sy_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#888;'
-                )
-
-            # --- Backend (graph-optimized) ---
-            ui.label('Graph Backend (global)').style('font-size:10px; color:#888; margin-top:8px;')
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('x (m)')
-                opt_x_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('y (m)')
-                opt_y_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('θ (°)')
-                opt_theta_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#69ff47;'
-                )
-
-            # --- Robot frame (velocity-domain, EKF-derived) ---
-            ui.label('Robot frame (local velocity)').style('font-size:10px; color:#888; margin-top:8px;')
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('v_x (m/s)')
-                rf_vx_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('v_y (m/s)')
-                rf_vy_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
-                )
-            with ui.row().classes('w-full items-center justify-between'):
-                ui.label('ω (°/s)')
-                rf_omega_label = ui.label('—').style(
-                    'font-variant-numeric:tabular-nums; font-family:monospace; color:#ffd600;'
-                )
-
-        CAMERA_W = 400
-        CAMERA_H = 296
-        # ── RIGHT COLUMN (plots + camera) ───────────────────────────
-        with ui.column().classes('flex-1 gap-2 overflow-hidden'):
-
-            # Plot — top half
-            with ui.card().classes('w-full items-center'):
-                ui.label('LiDAR / Localization').style('font-weight:600;')
-                main_plot = ui.pyplot(figsize=(10, 4))  # wider, shorter
-
-            # Camera — bottom half
-            with ui.card().classes('w-full overflow-hidden items-center'):
-                ui.label('Camera').style('font-weight:600;')
-                if stream_video:
-                    video_image = ui.interactive_image('/video/frame').style(
-                        f"width:{CAMERA_W}px;"
-                        f"height:{CAMERA_H}px;"
-                        f"object-fit:contain;"
-                        f"display:block;"
-                    )
-                else:
-                    ui.image('./robot_image.jpg').style(
-                        'width:100%; max-height: 285px; object-fit:contain;')
-                    video_image = None    
     
+    def make_robot_frame(sensor, EncoderState, LidarScan, RobotFrame):
+        """Convert robot_code.RobotSensorSignal into the SLAM RobotFrame type."""
+        timestamp = time_module.perf_counter()
+        encoder = EncoderState(
+            left_ticks=int(sensor.encoder_left_counts),
+            right_ticks=int(sensor.encoder_right_counts),
+            timestamp=timestamp,
+        )
 
+        lidar_scan = None
+        count = min(
+            int(getattr(sensor, 'num_lidar_rays', 0)),
+            len(getattr(sensor, 'angles', [])),
+            len(getattr(sensor, 'distances', [])),
+        )
+        if count > 0:
+            ranges = [sensor.convert_hardware_distance(sensor.distances[i]) for i in range(count)]
+            angles = [sensor.convert_hardware_angle(sensor.angles[i]) for i in range(count)]
+            lidar_scan = LidarScan(
+                ranges=ranges,
+                angles=angles,
+                timestamp=timestamp,
+                frame_id='hardware_lidar',
+            )
+
+        return RobotFrame(timestamp=timestamp, encoder=encoder, lidar_scan=lidar_scan)
     # Main control loop
+    async def control_loop():
+        try:
+            update_connection_to_robot()
+
+            if controller_switch.value and ctrl['joystick']:
+                pygame.event.pump()
+                js = ctrl['joystick']
+                r2    = js.get_axis(5)
+                steer = js.get_axis(0)
+                speed = (r2 + 1) / 2
+                if speed > DEADZONE:
+                    left_val  = speed * (1 + steer)
+                    right_val = speed * (1 - steer)
+                    cmd_state['left']  = int(min(1.0, max(0.0, left_val))  * BASE_SPEED)
+                    cmd_state['right'] = int(min(1.0, max(0.0, right_val)) * BASE_SPEED)
+                elif abs(steer) > DEADZONE:
+                    if steer > 0:
+                        cmd_state['left']  = int(steer  * SPIN_SPEED)
+                        cmd_state['right'] = 0
+                    else:
+                        cmd_state['left']  = 0
+                        cmd_state['right'] = int(-steer * SPIN_SPEED)
+                else:
+                    cmd_state['left'] = cmd_state['right'] = 0
+
+            await run.io_bound(
+                robot.control_loop,
+                cmd_state['left'],
+                cmd_state['right'],
+                logging_switch.value,
+            )
+
+            encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
+            encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
+            update_lidar_data()
+
+            if slam is not None and EncoderState is not None:
+                try:
+                    robot_frame = make_robot_frame(
+                        robot.robot_sensor_signal, EncoderState, LidarScan, RobotFrame
+                    )
+                    slam.run_frontend(robot_frame)
+
+                    with robot.camera_sensor._lock:
+                        pending_obs = robot.camera_sensor.landmark_observations[:]
+                        robot.camera_sensor.landmark_observations.clear()
+                    for obs in pending_obs:
+                        slam.add_landmark_observation(obs)
+
+                    if backend_switch.value:
+                        slam.run_backend()
+
+                except Exception as exc:
+                    print(f"[SLAM] pipeline error: {exc}")
+
+            update_pose_labels()
+
+            slam_state['_plot_tick'] += 1
+            if slam_state['_plot_tick'] % 5 == 0:
+                update_slam_plot()
+
+            update_video(video_image)
+
+        except Exception as exc:
+            import traceback
+            print(f"[TIMER FATAL] {exc}")
+            traceback.print_exc()
+    
     ui.keyboard(on_key=update_commands)
     draw_room()
-    async def control_loop():
-        update_connection_to_robot()
-        
-        if controller_switch.value and ctrl['joystick']:
-            pygame.event.pump()                    # refresh joystick state
-            js = ctrl['joystick']
-
-            r2    = js.get_axis(5)                 # R2 trigger:   [-1, 1]
-            steer = js.get_axis(0)                 # Left stick X: [-1, 1]
-            speed = (r2 + 1) / 2                   # normalize to  [ 0, 1]
-
-            if speed > DEADZONE:
-                # Forward + steer: mix speed and steering into L/R
-                # steer > 0 → turn right (slow right, fast left)
-                left_val  = speed * (1 + steer)
-                right_val = speed * (1 - steer)
-                cmd_state['left']  = int(min(1.0, max(0.0, left_val))  * BASE_SPEED)
-                cmd_state['right'] = int(min(1.0, max(0.0, right_val)) * BASE_SPEED)
-            elif abs(steer) > DEADZONE:
-                # No throttle → spin in place
-                if steer > 0:   # stick right → spin right (left wheel drives)
-                    cmd_state['left']  = int(steer  * SPIN_SPEED)
-                    cmd_state['right'] = 0
-                else:            # stick left  → spin left  (right wheel drives)
-                    cmd_state['left']  = 0
-                    cmd_state['right'] = int(-steer * SPIN_SPEED)
-            else:
-                cmd_state['left'] = cmd_state['right'] = 0
-        
-
-        robot.control_loop(cmd_state['left'], cmd_state['right'], logging_switch.value)
-        encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
-        encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
-        update_lidar_data()
-
-        # TODO: Update plots
-        update_lidar_data()
-        if slam is not None and EncoderState is not None:
-            try:
-                # A. Build RobotFrame from hardware sensor signal
-                robot_frame = make_robot_frame(
-                    robot.robot_sensor_signal, EncoderState, LidarScan, RobotFrame
-                )
-
-                # B. Run EKF frontend (predict + LiDAR correct + keyframe logic)
-                slam.run_frontend(robot_frame)
-
-                # C. Drain camera landmark observations and feed to SLAM
-                with robot.camera_sensor._lock:
-                    pending_obs = robot.camera_sensor.landmark_observations[:]
-                    robot.camera_sensor.landmark_observations.clear()
-                for obs in pending_obs:
-                    slam.add_landmark_observation(obs)
-
-                # D. Conditionally run backend optimizer
-                if backend_switch.value:
-                    slam.run_backend()   # uses internal timing/keyframe threshold
-
-            except Exception as exc:
-                print(f"[SLAM] pipeline error: {exc}")
-
-        update_pose_labels()
-        
-        update_video(video_image)
-
     ui.timer(0.1, control_loop)
 
 

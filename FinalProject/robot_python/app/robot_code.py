@@ -12,9 +12,9 @@ from time import strftime
 import threading
 from pathlib import Path
 import sys
-import data_types
+from FinalProject.robot_python import data_types
 # Parameters
-import parameters
+from FinalProject.robot_python import parameters
 
 
 # ---- MAIN ROBOT CLASS ---- 
