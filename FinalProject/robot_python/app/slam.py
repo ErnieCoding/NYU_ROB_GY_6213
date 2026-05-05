@@ -141,13 +141,28 @@ class SLAMSystem:
         self._latest_keyframe_id = new_keyframe_id
         self._new_keyframes_since_optimization += 1
 
-        if previous_keyframe_id is not None:
-            if odom_motion is not None:
-                self.pose_graph.add_odometry_factor(previous_keyframe_id, new_keyframe_id, odom_motion)
-            if lidar_motion is not None:
-                self.pose_graph.add_lidar_factor(previous_keyframe_id, new_keyframe_id, lidar_motion)
+        if previous_keyframe_id is not None and self._prev_keyframe_robot_frame is not None:
+            previous_keyframe_pose = self.pose_graph.nodes[previous_keyframe_id].pose.pose
+            keyframe_odom_motion, _ = self.motion_model.predict_motion(
+                previous_keyframe_pose,
+                self._prev_keyframe_robot_frame.encoder,
+                robot_frame.encoder,
+            )
+            self.pose_graph.add_odometry_factor(previous_keyframe_id, new_keyframe_id, keyframe_odom_motion)
 
-        self._maybe_add_loop_closure_factor(new_keyframe_id, robot_frame)
+            if self._prev_keyframe_robot_frame.lidar_scan is not None and robot_frame.lidar_scan is not None:
+                keyframe_lidar_motion = self.lidar_matcher.match_scans(
+                    self._prev_keyframe_robot_frame.lidar_scan,
+                    robot_frame.lidar_scan,
+                    init_guess=Pose2D(
+                        keyframe_odom_motion.dx,
+                        keyframe_odom_motion.dy,
+                        keyframe_odom_motion.dtheta,
+                    ),
+                )
+                self.pose_graph.add_lidar_factor(previous_keyframe_id, new_keyframe_id, keyframe_lidar_motion)
+        ##not sure yet about loop closure factors::
+        #self._maybe_add_loop_closure_factor(new_keyframe_id, robot_frame)
         self._prev_keyframe_robot_frame = robot_frame
         return True
 

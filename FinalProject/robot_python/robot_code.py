@@ -381,7 +381,7 @@ class CameraSensor:
                     
 
                     # TODO: Fill in camera variance
-                    tvec_m = tvec / 100.0;
+                    tvec_m = tvec / 100.0
                     cov = self.get_camera_covariance(tvec_m)
                     if last is None or x_cm != self._latest_pose[1] or z_cm != self._latest_pose[3]:
                         robot_pose = self.marker_to_robot_pose(pose_result)

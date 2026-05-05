@@ -6,7 +6,8 @@ import math
 import numpy as np
 from FinalProject.robot_python.config.config import RobotConfig
 from FinalProject.robot_python.data_types import EncoderState, Pose2D, RelativeMotion, normalize_angle
-
+#import paramaters
+from FinalProject.robot_python import parameters
 
 class DifferentialDriveMotionModel:
     """Compute relative motion and pose predictions from wheel encoder states."""
@@ -38,8 +39,12 @@ class DifferentialDriveMotionModel:
         return 0.00679702*abs(s_R_pred)**2 + -0.01167738*abs(s_R_pred) + 0.00900622
 
 
-    def RelativeMotion_change(self, prev_encoder: EncoderState, curr_encoder: EncoderState) -> RelativeMotion:
-        """Estimate robot-frame motion between two encoder readings.
+    def _wheel_motion_components(
+        self,
+        prev_encoder: EncoderState,
+        curr_encoder: EncoderState,
+    ) -> tuple[RelativeMotion, float, np.ndarray]:
+        """Compute local relative motion, distance traveled, and wheel covariance.
 
         Flow:
         encoder tick differences -> fitted wheel conversion ->
@@ -63,22 +68,79 @@ class DifferentialDriveMotionModel:
         dy = delta_s * math.sin(0.5 * delta_theta)
         dtheta = normalize_angle(delta_theta)
 
-        #motion model inputs noise matrix:
-        Motion_inputs_covariance = np.array([
+        # Motion model input noise matrix in left/right wheel-distance space.
+        wheel_covariance = np.array([
                 [sigma_L2, 0.0],
                 [0.0, sigma_R2],
             ])
 
-        
-
-        #return relative motion and also the distance traveled
-        return RelativeMotion(
+        motion = RelativeMotion(
             dx=dx,
             dy=dy,
             dtheta=dtheta,
-            covariance=Motion_inputs_covariance,
+            covariance=None,
             source="wheel_odometry",
-        ), delta_s
+        )
+        return motion, delta_s, wheel_covariance
+
+    def RelativeMotion_change(
+        self,
+        prev_encoder: EncoderState,
+        curr_encoder: EncoderState,
+    ) -> tuple[RelativeMotion, float]:
+        """Estimate local relative motion between two encoder readings.
+
+        Kept for compatibility with older scripts. New EKF/backend code should
+        use predict_motion so the returned motion includes 3x3 pose covariance.
+        """
+        motion, delta_s, wheel_covariance = self._wheel_motion_components(prev_encoder, curr_encoder)
+        motion.covariance = wheel_covariance
+        return motion, delta_s
+
+    def state_jacobian(self, prev_pose: Pose2D, motion: RelativeMotion, delta_s: float) -> np.ndarray:
+        """Jacobian of pose propagation with respect to the previous pose."""
+        theta_m = prev_pose.theta + 0.5 * motion.dtheta
+        return np.array([
+            [1.0, 0.0, -delta_s * math.sin(theta_m)],
+            [0.0, 1.0,  delta_s * math.cos(theta_m)],
+            [0.0, 0.0,  1.0],
+        ])
+
+    def control_jacobian(self, prev_pose: Pose2D, motion: RelativeMotion, delta_s: float) -> np.ndarray:
+        """Jacobian of pose propagation with respect to wheel distances."""
+        theta_m = prev_pose.theta + 0.5 * motion.dtheta
+        wheel_base = self.config.wheel_base_m
+        return np.array([
+            [
+                0.5 * np.cos(theta_m) + (delta_s / (2 * parameters.wheel_base)) * np.sin(theta_m),
+                0.5 * np.cos(theta_m) - (delta_s / (2 * parameters.wheel_base)) * np.sin(theta_m),
+            ],
+            [
+                0.5 * np.sin(theta_m) - (delta_s / (2 * parameters.wheel_base)) * np.cos(theta_m),
+                0.5 * np.sin(theta_m) + (delta_s / (2 * parameters.wheel_base)) * np.cos(theta_m),
+            ],
+            [
+                -1.0 / wheel_base,
+                1.0 / wheel_base,
+            ],
+        ])
+
+    def process_covariance(self, G: np.ndarray, wheel_covariance: np.ndarray) -> np.ndarray:
+        """Propagate wheel-distance covariance into 3x3 pose covariance."""
+        return G @ wheel_covariance @ G.T
+
+    def predict_motion(
+        self,
+        prev_pose: Pose2D,
+        prev_encoder: EncoderState,
+        curr_encoder: EncoderState,
+    ) -> tuple[RelativeMotion, np.ndarray]:
+        """Return local odometry motion with 3x3 covariance and EKF F matrix."""
+        motion, delta_s, wheel_covariance = self._wheel_motion_components(prev_encoder, curr_encoder)
+        F = self.state_jacobian(prev_pose, motion, delta_s)
+        G = self.control_jacobian(prev_pose, motion, delta_s)
+        motion.covariance = self.process_covariance(G, wheel_covariance)
+        return motion, F
 
     def propagate(self, prev_pose: Pose2D, motion: RelativeMotion) -> Pose2D:
         """Apply a relative odometry increment to a pose estimate."""
