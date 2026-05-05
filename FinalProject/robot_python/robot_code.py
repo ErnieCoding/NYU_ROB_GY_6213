@@ -32,7 +32,6 @@ class Robot:
         self.data_logger = DataLogger(parameters.filename_start, parameters.data_name_list)
         self.robot_sensor_signal = RobotSensorSignal([0, 0, 0])
         self.camera_sensor_signal = []
-        # TODO: ADD FILTER
         
         
     # Create udp senders and receiver instances with the udp communication
@@ -47,13 +46,6 @@ class Robot:
         self.msg_receiver = None
         print("Eliminate UDP !!!")
 
-    # TODO: UPDATE TO OUR STATE ESTIMATION
-    # def update_state_estimate(self):
-    #     u_t = np.array([self.robot_sensor_signal.encoder_counts, self.robot_sensor_signal.steering]) # robot_sensor_signal
-    #     z_t = self.robot_sensor_signal
-    #     delta_t = 0.1
-    #     self.particle_filter.update(u_t, z_t, delta_t)
-
     # One iteration of the control loop to be called repeatedly
     def control_loop(self, cmd_speed_left = 0, cmd_speed_right = 0, logging_switch_on = False):        
         # Receive msg
@@ -63,9 +55,6 @@ class Robot:
         self.camera_sensor_signal = self.camera_sensor.get_signal(self.camera_sensor_signal)
         print(f"[CAMERA] Received sensor signal: {self.camera_sensor_signal}")
 
-        # TODO: UPDATE TO OUR STATE ESTIMATION
-        # Update the state estimates
-        # self.update_state_estimate()
 
         # Update control signals
         control_signal = [cmd_speed_left, cmd_speed_right]

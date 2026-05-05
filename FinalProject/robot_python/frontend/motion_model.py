@@ -109,7 +109,6 @@ class DifferentialDriveMotionModel:
     def control_jacobian(self, prev_pose: Pose2D, motion: RelativeMotion, delta_s: float) -> np.ndarray:
         """Jacobian of pose propagation with respect to wheel distances."""
         theta_m = prev_pose.theta + 0.5 * motion.dtheta
-        wheel_base = self.config.wheel_base_m
         return np.array([
             [
                 0.5 * np.cos(theta_m) + (delta_s / (2 * parameters.wheel_base)) * np.sin(theta_m),
@@ -120,8 +119,8 @@ class DifferentialDriveMotionModel:
                 0.5 * np.sin(theta_m) + (delta_s / (2 * parameters.wheel_base)) * np.cos(theta_m),
             ],
             [
-                -1.0 / wheel_base,
-                1.0 / wheel_base,
+                -1.0 / parameters.wheel_base,
+                1.0 / parameters.wheel_base,
             ],
         ])
 

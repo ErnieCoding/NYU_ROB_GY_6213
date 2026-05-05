@@ -28,9 +28,10 @@ class LidarMatcher:
         for index in range(0, len(scan.ranges), step):
 
             # Get a single measurement in mm, preprocess with bias, convert to m
-            range_mm = scan.ranges[index]
-            corrected_measurement = self.correct_measurement(range_mm)
-            range_m = corrected_measurement / 1000
+            range_m = scan.ranges[index]
+            raw_mm = range_m * 1000.0
+            corrected_mm = self.correct_measurement(raw_mm)
+            range_m = corrected_mm / 1000.0
             
             if self.robot_config.lidar_min_range_m <= range_m <= self.robot_config.lidar_max_range_m:
                 valid_ranges.append(range_m)
@@ -63,7 +64,7 @@ class LidarMatcher:
         prev_scan: LidarScan,
         curr_scan: LidarScan,
         init_guess: Pose2D | None = None,
-    ) -> RelativeMotion:
+    ) -> RelativeMotion | None:
         """Estimate relative motion between consecutive LiDAR scans."""
         # First clean both scans using the same range filtering and
         # downsampling rules used by the rest of the front-end.
@@ -84,14 +85,15 @@ class LidarMatcher:
         # ICP needs at least a few points to estimate a meaningful transform.
         # If either scan is too small, return a low-quality zero motion.
         if len(prev_points) < 3 or len(curr_points) < 3:
-            return RelativeMotion(
-                dx=0.0,
-                dy=0.0,
-                dtheta=0.0,
-                covariance=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
-                quality=0.0,
-                source="lidar_icp",
-            )
+            # return RelativeMotion(
+            #     dx=0.0,
+            #     dy=0.0,
+            #     dtheta=0.0,
+            #     covariance=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            #     quality=0.0,
+            #     source="lidar_icp",
+            # )
+            return None
 
         # Wrap the numpy point arrays in Open3D point cloud objects.
         # The current scan will be aligned onto the previous scan.
@@ -153,10 +155,12 @@ class LidarMatcher:
             return RelativeMotion(dx=0.0, dy=0.0, dtheta=0.0, covariance=covariance, quality=quality, source="lidar_icp")
 
         # Extract the 2D translation and yaw angle from the 4x4 ICP transform.
-        transform = result.transformation
-        dx = float(transform[0, 3])
-        dy = float(transform[1, 3])
-        dtheta = math.atan2(float(transform[1, 0]), float(transform[0, 0]))
+        # current code estimates T_curr_to_prev
+        T_curr_to_prev = result.transformation
+        T_prev_to_curr = np.linalg.inv(T_curr_to_prev)
+        dx = float(T_prev_to_curr[0, 3])
+        dy = float(T_prev_to_curr[1, 3])
+        dtheta = math.atan2(float(T_prev_to_curr[1, 0]), float(T_prev_to_curr[0, 0]))
 
         # TODO: Change implementation to the actual paper implementation with calculated residuals
         mean_range_mm = float(np.mean(curr_scan.ranges)) * 1000.0 if curr_scan.ranges else 700.0
@@ -166,9 +170,9 @@ class LidarMatcher:
         sigma_xy = max(rmse, 1e-3) * (sigma2_range ** 0.5)
         sigma_theta = sigma_xy / mean_range_m
         covariance = [
-            [sigma_xy, 0.0, 0.0], 
-            [0.0, sigma_xy, 0.0], 
-            [0.0, 0.0, sigma_theta]
+            [sigma_xy**2, 0.0, 0.0], 
+            [0.0, sigma_xy**2, 0.0], 
+            [0.0, 0.0, sigma_theta**2]
         ]
 
         # Return the relative motion from current scan to previous scan,

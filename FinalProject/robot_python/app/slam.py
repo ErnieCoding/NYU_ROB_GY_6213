@@ -15,6 +15,7 @@ from FinalProject.robot_python.data_types import (
     Pose2D,
     PoseEstimate,
     RobotFrame,
+    normalize_angle
 )
 from FinalProject.robot_python.frontend.ekf import EKFLocalizer
 from FinalProject.robot_python.frontend.lidar_matching import LidarMatcher
@@ -58,16 +59,30 @@ class SLAMSystem:
         # EKF correction from LiDAR scan-to-scan registration, matching the
         # paper's LiDAR relative-pose observation model.
         if self._prev_robot_frame and self._prev_robot_frame.lidar_scan and robot_frame.lidar_scan:
+            init_guess = None
+            if odom_motion is not None:
+                init_guess = Pose2D(
+                    x = odom_motion.dx,
+                    y = odom_motion.dy,
+                    theta=odom_motion.dtheta
+                )
+            
             lidar_motion = self.lidar_matcher.match_scans(
                 self._prev_robot_frame.lidar_scan,
                 robot_frame.lidar_scan,
-                init_guess=pose_estimate.pose,
+                init_guess=init_guess,
             )
-            # pose_estimate = self.ekf.correct_with_lidar(lidar_motion)
+
+            if lidar_motion is not None:
+                pose_estimate = self.ekf.correct_with_lidar(lidar_motion)
 
         pose_estimate.timestamp = robot_frame.timestamp
-        created_keyframe = self._maybe_add_keyframe(pose_estimate, odom_motion, lidar_motion, robot_frame)
-        self._update_local_map(pose_estimate, robot_frame, self._latest_keyframe_id if created_keyframe else None)
+        created_keyframe = self._maybe_add_keyframe(
+            pose_estimate, odom_motion, lidar_motion, robot_frame
+        )
+        self._update_local_map(
+            pose_estimate, robot_frame, self._latest_keyframe_id if created_keyframe else None
+        )
         self._prev_robot_frame = robot_frame
 
         output = FrontendOutput(
@@ -160,7 +175,13 @@ class SLAMSystem:
                         keyframe_odom_motion.dtheta,
                     ),
                 )
-                self.pose_graph.add_lidar_factor(previous_keyframe_id, new_keyframe_id, keyframe_lidar_motion)
+
+                if keyframe_lidar_motion is not None:
+                    self.pose_graph.add_lidar_factor(
+                        previous_keyframe_id, 
+                        new_keyframe_id, 
+                        keyframe_lidar_motion
+                    )
         ##not sure yet about loop closure factors::
         #self._maybe_add_loop_closure_factor(new_keyframe_id, robot_frame)
         self._prev_keyframe_robot_frame = robot_frame
@@ -173,7 +194,7 @@ class SLAMSystem:
         latest_node = self.pose_graph.nodes[self._latest_keyframe_id]
         latest_pose = latest_node.pose.pose
         translation = pose.distance_to(latest_pose)
-        rotation = abs(pose.theta - latest_pose.theta)
+        rotation = abs(normalize_angle(pose.theta - latest_pose.theta))
         return (
             translation >= self.config.frontend.keyframe_translation_m
             or rotation >= self.config.frontend.keyframe_rotation_rad
@@ -260,6 +281,10 @@ class SLAMSystem:
             robot_frame.lidar_scan,
             init_guess=None,
         )
+
+        if loop_motion is None:
+            return
+        
         loop_motion.source = "lidar_icp_loop_closure"
 
         quality = loop_motion.quality if loop_motion.quality is not None else 0.0
