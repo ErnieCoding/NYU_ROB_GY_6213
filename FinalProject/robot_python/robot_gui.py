@@ -217,6 +217,8 @@ def main():
     
     try:
         slam, EncoderState, LidarScan, RobotFrame = create_slam_system()
+        from FinalProject.robot_python.data_types import Pose2D
+        slam.ekf.reset(Pose2D(x=0.20, y=0.20, theta=math.pi / 2))
         slam_error = None
     except Exception as exc:
         slam = None

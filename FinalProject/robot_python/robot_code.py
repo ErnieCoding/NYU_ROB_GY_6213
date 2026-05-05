@@ -31,7 +31,7 @@ class Robot:
         self.camera_sensor = CameraSensor(parameters.camera_url)
         self.data_logger = DataLogger(parameters.filename_start, parameters.data_name_list)
         self.robot_sensor_signal = RobotSensorSignal([0, 0, 0])
-        self.camera_sensor_signal = [0,0,0,0,0,0]
+        self.camera_sensor_signal = []
         # TODO: ADD FILTER
         
         
@@ -285,7 +285,7 @@ class CameraSensor:
         self._lock = threading.Lock()
         self._latest_raw_frame = None
         self._latest_annotated_frame = None
-        self._latest_pose = [None, None, None, None, None, None, None]
+        self._latest_pose = []
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
@@ -319,7 +319,7 @@ class CameraSensor:
                 continue
 
             annotated_frame = raw_frame.copy()
-            pose_result = None
+            pose_results = []
 
             gray = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2GRAY)
             corners, ids, _ = self.detector.detectMarkers(gray)
@@ -335,18 +335,18 @@ class CameraSensor:
                 )
 
                 for i in range(len(ids)):
-                    marker_id = ids[i][0]
+                    marker_id = int(ids[i][0])
                     rvec = rvecs[i]
                     tvec = tvecs[i][0]
 
-                    x_cm = tvec[0] * 100
-                    y_cm = tvec[1] * 100
-                    z_cm = tvec[2] * 100
+                    x_cm = float(tvec[0] * 100)
+                    y_cm = float(tvec[1] * 100)
+                    z_cm = float(tvec[2] * 100)
 
                     R, _ = cv2.Rodrigues(rvec)
-                    yaw   = np.degrees(np.arctan2(R[1, 0], R[0, 0]))
-                    pitch = np.degrees(np.arctan2(-R[2, 0], np.sqrt(R[2, 1]**2 + R[2, 2]**2)))
-                    roll  = np.degrees(np.arctan2(R[2, 1], R[2, 2]))
+                    yaw   = float(np.degrees(np.arctan2(R[1, 0], R[0, 0])))
+                    pitch = float(np.degrees(np.arctan2(-R[2, 0], np.sqrt(R[2, 1]**2 + R[2, 2]**2))))
+                    roll  = float(np.degrees(np.arctan2(R[2, 1], R[2, 2])))
 
                     print(
                         f"[CAMERA] ID {marker_id} | "
@@ -375,6 +375,7 @@ class CameraSensor:
 
                     
                     pose_result = [marker_id, x_cm, y_cm, z_cm, yaw, pitch, roll]
+                    pose_results.append(pose_result)
 
                     with self._lock:
                         last = self._latest_pose_by_id.get(marker_id)
@@ -383,7 +384,7 @@ class CameraSensor:
                     # TODO: Fill in camera variance
                     tvec_m = tvec / 100.0
                     cov = self.get_camera_covariance(tvec_m)
-                    if last is None or x_cm != self._latest_pose[1] or z_cm != self._latest_pose[3]:
+                    if last is None or x_cm != last[1] or z_cm != last[3]:
                         robot_pose = self.marker_to_robot_pose(pose_result)
                         obs = data_types.LandmarkObservation(
                                 timestamp=time.perf_counter(),
@@ -393,13 +394,14 @@ class CameraSensor:
                             )
 
                         with self._lock:
+                            self._latest_pose_by_id[marker_id] = pose_result
                             self.landmark_observations.append(obs) 
 
             # --- Atomically store results ---
             with self._lock:
                 self._latest_raw_frame = raw_frame
                 self._latest_annotated_frame = annotated_frame
-                self._latest_pose = pose_result
+                self._latest_pose = pose_results
 
             time.sleep(0.05)
 
@@ -442,10 +444,8 @@ class CameraSensor:
     
     def get_pose_estimate(self):
         with self._lock:
-            pose = self._latest_pose
-        if pose is not None:
-            return True, pose
-        return False, []
+            pose = [row[:] for row in self._latest_pose]
+        return True, pose
         
     # Get a new pose estimate from a camera image
     def get_signal(self, last_camera_signal):
