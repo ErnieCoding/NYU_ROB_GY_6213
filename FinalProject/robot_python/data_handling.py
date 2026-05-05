@@ -74,9 +74,6 @@ def get_file_data(filename):
 
     encoder_left_count_list = []
     encoder_right_count_list = []
-    velocity_left_list = []
-    velocity_right_list = []
-    steering_angle_list = []
     x_camera_list = []
     y_camera_list = []
     z_camera_list = []
@@ -86,13 +83,7 @@ def get_file_data(filename):
         encoder_left_count_list.append(row.encoder_left_counts)
         encoder_right_count_list.append(row.encoder_right_counts)
 
-    for row in control_signal_list:
-        # Assumes control_signal is something like [velocity, steering_angle]
-        velocity_left_list.append(row[0])
-        velocity_right_list.append(row[1])
-
     for row in camera_sensor_signal_list:
-        # Assumes pose_estimate = [x, y, z, rvecx, rvecy, rvecz]
         x_camera_list.append(row[0])
         y_camera_list.append(row[1])
         z_camera_list.append(row[2])
@@ -104,9 +95,6 @@ def get_file_data(filename):
         time_list,
         encoder_left_count_list,
         encoder_right_count_list,
-        velocity_left_list,
-        velocity_right_list,
-        steering_angle_list,
         x_camera_list,
         y_camera_list,
         z_camera_list,

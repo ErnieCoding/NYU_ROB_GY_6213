@@ -57,8 +57,6 @@ class EKFLocalizer:
 
     def correct_with_lidar(self, lidar_measurement: RelativeMotion | PoseEstimate) -> PoseEstimate:
         """Run the EKF correction step from LiDAR scan matching."""
-       
-
         if not isinstance(lidar_measurement, RelativeMotion):
             self._state.source = "ekf_lidar_placeholder"
             return self.get_state()
