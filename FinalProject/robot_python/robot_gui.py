@@ -27,7 +27,7 @@ for _p in [str(_ROOT_DIR), str(_PROJECT_DIR), str(_PYTHON_DIR), str(_APP_DIR)]:
 
 # Local libraries
 # import FinalProject.robot_python.robot_code as robot_code
-import robot_code
+import FinalProject.robot_python.robot_code as robot_code
 from FinalProject.robot_python import parameters
 
 # Global variables
@@ -858,74 +858,65 @@ def main():
             )
 
         return RobotFrame(timestamp=timestamp, encoder=encoder, lidar_scan=lidar_scan)
+    
     # Main control loop
     async def control_loop():
-        try:
-            update_connection_to_robot()
+        update_connection_to_robot()
 
-            if controller_switch.value and ctrl['joystick']:
-                pygame.event.pump()
-                js = ctrl['joystick']
-                r2    = js.get_axis(5)
-                steer = js.get_axis(0)
-                speed = (r2 + 1) / 2
-                if speed > DEADZONE:
-                    left_val  = speed * (1 + steer)
-                    right_val = speed * (1 - steer)
-                    cmd_state['left']  = int(min(1.0, max(0.0, left_val))  * BASE_SPEED)
-                    cmd_state['right'] = int(min(1.0, max(0.0, right_val)) * BASE_SPEED)
-                elif abs(steer) > DEADZONE:
-                    if steer > 0:
-                        cmd_state['left']  = int(steer  * SPIN_SPEED)
-                        cmd_state['right'] = 0
-                    else:
-                        cmd_state['left']  = 0
-                        cmd_state['right'] = int(-steer * SPIN_SPEED)
+        if controller_switch.value and ctrl['joystick']:
+            pygame.event.pump()
+            js = ctrl['joystick']
+            r2    = js.get_axis(5)
+            steer = js.get_axis(0)
+            speed = (r2 + 1) / 2
+            if speed > DEADZONE:
+                left_val  = speed * (1 + steer)
+                right_val = speed * (1 - steer)
+                cmd_state['left']  = int(min(1.0, max(0.0, left_val))  * BASE_SPEED)
+                cmd_state['right'] = int(min(1.0, max(0.0, right_val)) * BASE_SPEED)
+            elif abs(steer) > DEADZONE:
+                if steer > 0:
+                    cmd_state['left']  = int(steer  * SPIN_SPEED)
+                    cmd_state['right'] = 0
                 else:
-                    cmd_state['left'] = cmd_state['right'] = 0
+                    cmd_state['left']  = 0
+                    cmd_state['right'] = int(-steer * SPIN_SPEED)
+            else:
+                cmd_state['left'] = cmd_state['right'] = 0
 
-            await run.io_bound(
-                robot.control_loop,
-                cmd_state['left'],
-                cmd_state['right'],
-                logging_switch.value,
-            )
+        robot.control_loop(cmd_state['left'], cmd_state['right'], logging_switch.value)
 
-            encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
-            encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
-            update_lidar_data()
+        encoder_left_count_label.set_text(str(robot.robot_sensor_signal.encoder_left_counts))
+        encoder_right_count_label.set_text(str(robot.robot_sensor_signal.encoder_right_counts))
+        update_lidar_data()
 
-            if slam is not None and EncoderState is not None:
-                try:
-                    robot_frame = make_robot_frame(
-                        robot.robot_sensor_signal, EncoderState, LidarScan, RobotFrame
-                    )
-                    slam.run_frontend(robot_frame)
+        # SLAM pipeline
+        if slam is not None and EncoderState is not None:
+            try:
+                robot_frame = make_robot_frame(
+                    robot.robot_sensor_signal, EncoderState, LidarScan, RobotFrame
+                )
+                slam.run_frontend(robot_frame)
 
-                    with robot.camera_sensor._lock:
-                        pending_obs = robot.camera_sensor.landmark_observations[:]
-                        robot.camera_sensor.landmark_observations.clear()
-                    for obs in pending_obs:
-                        slam.add_landmark_observation(obs)
+                with robot.camera_sensor._lock:
+                    pending_obs = robot.camera_sensor.landmark_observations[:]
+                    robot.camera_sensor.landmark_observations.clear()
+                for obs in pending_obs:
+                    slam.add_landmark_observation(obs)
 
-                    if backend_switch.value:
-                        slam.run_backend()
+                if backend_switch.value:
+                    slam.run_backend()
 
-                except Exception as exc:
-                    print(f"[SLAM] pipeline error: {exc}")
+            except Exception as exc:
+                print(f"[SLAM] pipeline error: {exc}")
 
-            update_pose_labels()
+        update_pose_labels()
 
-            slam_state['_plot_tick'] += 1
-            if slam_state['_plot_tick'] % 5 == 0:
-                update_slam_plot()
+        slam_state['_plot_tick'] += 1
+        if slam_state['_plot_tick'] % 5 == 0:
+            update_slam_plot()
 
-            update_video(video_image)
-
-        except Exception as exc:
-            import traceback
-            print(f"[TIMER FATAL] {exc}")
-            traceback.print_exc()
+        update_video(video_image)
     
     ui.keyboard(on_key=update_commands)
     draw_room()

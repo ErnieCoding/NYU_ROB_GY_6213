@@ -12,9 +12,10 @@ from time import strftime
 import threading
 from pathlib import Path
 import sys
-from FinalProject.robot_python import data_types
-# Parameters
-from FinalProject.robot_python import parameters
+
+import data_types
+import parameters
+
 
 
 # ---- MAIN ROBOT CLASS ---- 
@@ -191,7 +192,7 @@ class DataLoader:
 class MsgSender:
 
     # Time step size between message to robot sends, in seconds
-    delta_send_time = 0.1
+    delta_send_time = 0.05
 
     # Constructor
     def __init__(self, last_send_time, msg_size, udp_communication):

@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 
 from FinalProject.robot_python.data_types import Pose2D
 
-import FinalProject.robot_python.parameters
-
 
 @dataclass
 class RobotConfig:
