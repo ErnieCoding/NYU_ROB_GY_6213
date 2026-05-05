@@ -1,157 +1,376 @@
-"""Offline replay runner for saved robot frames and landmark observations."""
+"""Offline replay for DataLogger pickle files, mirroring the GUI SLAM loop."""
 
 from __future__ import annotations
 
-import pickle
+import argparse
+import math
+import sys
 import time
+import types
 from pathlib import Path
 
 import numpy as np
 
-from FinalProject.robot_python.app.slam import SLAMSystem
-from FinalProject.robot_python.config.config import Config
-from FinalProject.robot_python.data_types import EncoderState, LandmarkObservation, LidarScan, Pose2D, RobotFrame
+_APP_DIR = Path(__file__).resolve().parent
+_PYTHON_DIR = _APP_DIR.parent
+_PROJECT_DIR = _PYTHON_DIR.parent
+_ROOT_DIR = _PROJECT_DIR.parent
+
+for _p in [str(_ROOT_DIR), str(_PROJECT_DIR), str(_PYTHON_DIR), str(_APP_DIR)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+def install_optional_slam_stubs() -> None:
+    """Keep offline replay usable when optional solver packages are absent."""
+    try:
+        import gtsam  # noqa: F401
+    except ModuleNotFoundError:
+        gtsam_stub = types.ModuleType("gtsam")
+
+        class Pose2:
+            def __init__(self, x, y, theta):
+                self._x = x
+                self._y = y
+                self._theta = theta
+
+            def x(self):
+                return self._x
+
+            def y(self):
+                return self._y
+
+            def theta(self):
+                return self._theta
+
+        class Values:
+            def __init__(self):
+                self._poses = {}
+
+            def insert(self, node_id, pose):
+                self._poses[node_id] = pose
+
+            def atPose2(self, node_id):
+                return self._poses[node_id]
+
+        class Graph:
+            def add(self, _factor):
+                return None
+
+        class Optimizer:
+            def __init__(self, _graph, initial):
+                self.initial = initial
+
+            def optimize(self):
+                return self.initial
+
+        gtsam_stub.Pose2 = Pose2
+        gtsam_stub.Values = Values
+        gtsam_stub.NonlinearFactorGraph = Graph
+        gtsam_stub.LevenbergMarquardtOptimizer = Optimizer
+        gtsam_stub.PriorFactorPose2 = lambda *args, **kwargs: ("prior", args, kwargs)
+        gtsam_stub.BetweenFactorPose2 = lambda *args, **kwargs: ("between", args, kwargs)
+        gtsam_stub.noiseModel = types.SimpleNamespace(
+            Gaussian=types.SimpleNamespace(Covariance=lambda covariance: covariance)
+        )
+        sys.modules["gtsam"] = gtsam_stub
+
+    try:
+        import open3d  # noqa: F401
+    except ModuleNotFoundError:
+        open3d_stub = types.ModuleType("open3d")
+
+        class PointCloud:
+            def __init__(self):
+                self.points = None
+
+        class ICPResult:
+            fitness = 0.0
+            inlier_rmse = 1.0
+            transformation = np.eye(4)
+
+        open3d_stub.geometry = types.SimpleNamespace(PointCloud=PointCloud)
+        open3d_stub.utility = types.SimpleNamespace(Vector3dVector=lambda points: points)
+        open3d_stub.pipelines = types.SimpleNamespace(
+            registration=types.SimpleNamespace(
+                registration_icp=lambda *args, **kwargs: ICPResult(),
+                TransformationEstimationPointToPoint=lambda: object(),
+                ICPConvergenceCriteria=lambda **kwargs: kwargs,
+            )
+        )
+        sys.modules["open3d"] = open3d_stub
+
+
+install_optional_slam_stubs()
+
+import robot_code  # noqa: E402  # Required for unpickling RobotSensorSignal logs.
+from FinalProject.robot_python import parameters  # noqa: E402
+from FinalProject.robot_python.app.slam import SLAMSystem  # noqa: E402
+from FinalProject.robot_python.config.config import Config  # noqa: E402
+from FinalProject.robot_python.data_handling import get_file_data  # noqa: E402
+from FinalProject.robot_python.data_types import (  # noqa: E402
+    EncoderState,
+    LandmarkObservation,
+    LidarScan,
+    Pose2D,
+    RobotFrame,
+)
+
+
+DEFAULT_INITIAL_POSE = Pose2D(x=0.20, y=0.20, theta=math.pi / 2)
 
 
 class OfflineRunner:
-    """Replay saved robot frames and processed landmarks into the SLAM system."""
+    """Replay GUI/DataLogger pickle files through the SLAM pipeline."""
 
     def __init__(
         self,
+        log_pickle_path: str | Path,
         config: Config | None = None,
-        robot_pickle_path: str | Path | None = None,
-        landmark_pickle_path: str | Path | None = None,
+        initial_pose: Pose2D = DEFAULT_INITIAL_POSE,
+        run_backend: bool = True,
+        replay_delay_s: float = 0.0,
     ) -> None:
+        self.log_pickle_path = Path(log_pickle_path)
         self.config = config or Config()
         self.slam = SLAMSystem(self.config)
-        log_dir = Path(self.config.runtime.log_dir)
-        self.robot_pickle_path = Path(robot_pickle_path) if robot_pickle_path else log_dir / "robot_frames.pkl"
-        self.landmark_pickle_path = (
-            Path(landmark_pickle_path) if landmark_pickle_path else log_dir / "landmark_observations.pkl"
-        )
+        self.slam.ekf.reset(initial_pose)
+        self.run_backend_enabled = run_backend
+        self.replay_delay_s = replay_delay_s
 
     def run(self) -> None:
-        """Replay robot frames and landmark observations in timestamp order."""
-        for item in self.load_data():
-            if isinstance(item, RobotFrame):
-                self.slam.run_frontend(item)
-            elif isinstance(item, LandmarkObservation):
-                self.slam.add_landmark_observation(item)
+        """Replay logged robot and camera samples in file order."""
+        (
+            time_list,
+            robot_signal_list,
+            _control_signal_list,
+            camera_detection_list,
+            _encoder_left_count_list,
+            _encoder_right_count_list,
+        ) = get_file_data(str(self.log_pickle_path))
 
-            self.slam.run_backend()
-            self._sleep_for_replay()
+        if not time_list or not robot_signal_list:
+            raise ValueError(f"No replayable robot samples found in {self.log_pickle_path}")
 
-    def load_robot_frames(self) -> list[RobotFrame]:
-        """Load robot frames from one pickle file."""
-        if not self.robot_pickle_path.is_file():
-            return []
+        n = min(len(time_list), len(robot_signal_list))
 
-        with self.robot_pickle_path.open("rb") as file:
-            items = pickle.load(file)
+        for index in range(n):
+            timestamp = float(time_list[index])
+            robot_signal = robot_signal_list[index]
+            robot_frame = self._robot_frame_from_logged_signal(robot_signal, timestamp)
+            self.slam.run_frontend(robot_frame)
 
-        frames: list[RobotFrame] = []
-        for item in items:
-            if isinstance(item, RobotFrame):
-                frames.append(item)
-            elif isinstance(item, dict):
-                frames.append(self._robot_frame_from_dict(item))
-            else:
-                raise TypeError(f"Unsupported robot frame item type: {type(item)!r}")
+            if index < len(camera_detection_list):
+                for obs in self._landmark_observations_from_camera_rows(
+                    camera_detection_list[index],
+                    timestamp,
+                ):
+                    self.slam.add_landmark_observation(obs)
 
-        return sorted(frames, key=lambda frame: frame.timestamp)
+            if self.run_backend_enabled:
+                self.slam.run_backend()
 
-    def load_landmark_observations(self) -> list[LandmarkObservation]:
-        """Load processed landmark observations from one pickle file."""
-        if not self.landmark_pickle_path.is_file():
-            return []
+            if self.replay_delay_s > 0.0:
+                time.sleep(self.replay_delay_s)
 
-        with self.landmark_pickle_path.open("rb") as file:
-            items = pickle.load(file)
+        if self.run_backend_enabled:
+            self._force_backend_once()
 
-        observations: list[LandmarkObservation] = []
-        for item in items:
-            if isinstance(item, LandmarkObservation):
-                observations.append(item)
-            elif isinstance(item, dict):
-                observations.append(self._landmark_observation_from_dict(item))
-            else:
-                raise TypeError(f"Unsupported landmark observation item type: {type(item)!r}")
+    def plot(self, output_path: str | Path | None = None, show: bool = True) -> None:
+        """Plot room geometry, SLAM trajectory, and live/optimized map points."""
+        import matplotlib.pyplot as plt
 
-        return sorted(observations, key=lambda obs: obs.timestamp)
+        local_map = self.slam.get_current_local_map()
+        optimized = self.slam.get_current_global_trajectory()
 
-    def load_data(self) -> list[RobotFrame | LandmarkObservation]:
-        """Load robot frames and landmark observations, then merge by timestamp."""
-        data: list[RobotFrame | LandmarkObservation] = []
-        data.extend(self.load_robot_frames())
-        data.extend(self.load_landmark_observations())
-        return sorted(data, key=lambda item: item.timestamp)
+        fig, ax = plt.subplots(figsize=(10, 7))
+        ax.set_facecolor("#0d0d0d")
+        fig.patch.set_facecolor("#0d0d0d")
 
-    def _robot_frame_from_dict(self, item: dict) -> RobotFrame:
-        """Convert one project-specific pickle dictionary into a RobotFrame."""
-        timestamp = float(item["timestamp"])
+        for wall in parameters.walls:
+            x1, y1 = parameters.corners[wall[0]]
+            x2, y2 = parameters.corners[wall[1]]
+            ax.plot([x1, x2], [y1, y2], color="#e0e0e0", linewidth=1.5)
 
-        encoder_item = item["encoder"]
-        if isinstance(encoder_item, EncoderState):
-            encoder = encoder_item
+        for tag_id, (tx, ty) in parameters.tags.items():
+            ax.scatter(tx, ty, color="#ff4444", s=35, marker="D")
+            ax.text(tx + 3, ty + 3, f"T{tag_id}", fontsize=7, color="#ff9999")
+
+        map_points = (
+            local_map.optimized_map_points
+            if local_map.optimized_map_points
+            else local_map.map_points
+        )
+        if map_points:
+            xs = [p[0] * 100.0 for p in map_points]
+            ys = [p[1] * 100.0 for p in map_points]
+            color = "#69ff47" if local_map.optimized_map_points else "#00e5ff"
+            label = "optimized map" if local_map.optimized_map_points else "frontend map"
+            ax.scatter(xs, ys, s=1.2, c=color, alpha=0.35, linewidths=0, label=label)
+
+        if local_map.trajectory:
+            tx = [estimate.pose.x * 100.0 for estimate in local_map.trajectory]
+            ty = [estimate.pose.y * 100.0 for estimate in local_map.trajectory]
+            ax.plot(tx, ty, color="#ffd600", linewidth=1.4, label="EKF trajectory")
+            ax.scatter(tx[0], ty[0], color="#ffffff", s=45, label="start")
+            ax.scatter(tx[-1], ty[-1], color="#ff6d00", s=45, label="end")
+
+        if optimized:
+            ids = sorted(optimized)
+            ox = [optimized[node_id].x * 100.0 for node_id in ids]
+            oy = [optimized[node_id].y * 100.0 for node_id in ids]
+            ax.plot(ox, oy, color="#69ff47", linewidth=1.8, label="optimized trajectory")
+
+        if local_map.landmark_observations:
+            lx = [obs.robot_pose_meas.x * 100.0 for obs in local_map.landmark_observations]
+            ly = [obs.robot_pose_meas.y * 100.0 for obs in local_map.landmark_observations]
+            ax.scatter(lx, ly, color="#aa00ff", s=18, alpha=0.6, label="camera pose measurements")
+
+        all_x = [p[0] for p in parameters.corners.values()] + [p[0] for p in parameters.tags.values()]
+        all_y = [p[1] for p in parameters.corners.values()] + [p[1] for p in parameters.tags.values()]
+        ax.set_xlim(min(all_x) - 20, max(all_x) + 20)
+        ax.set_ylim(min(all_y) - 20, max(all_y) + 20)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_xlabel("x (cm)", color="#dddddd")
+        ax.set_ylabel("y (cm)", color="#dddddd")
+        ax.tick_params(colors="#dddddd")
+        ax.legend(facecolor="#181818", edgecolor="#555555", labelcolor="#eeeeee")
+        ax.set_title(self.log_pickle_path.name, color="#eeeeee")
+        fig.tight_layout()
+
+        if output_path is not None:
+            fig.savefig(output_path, dpi=160)
+            print(f"Saved offline SLAM plot to {output_path}")
+
+        if show:
+            plt.show()
         else:
-            # TODO: Confirm these dict keys match the final Arduino pickle schema.
-            encoder = EncoderState(
-                left_ticks=int(encoder_item["left_ticks"]),
-                right_ticks=int(encoder_item["right_ticks"]),
-                timestamp=float(encoder_item.get("timestamp", timestamp)),
-            )
+            plt.close(fig)
 
-        lidar_item = item.get("lidar_scan")
-        lidar_scan = None
-        if isinstance(lidar_item, LidarScan):
-            lidar_scan = lidar_item
-        elif isinstance(lidar_item, dict):
-            # TODO: Confirm LiDAR angle/range field names once logging is final.
-            lidar_scan = LidarScan(
-                ranges=list(lidar_item["ranges"]),
-                angles=list(lidar_item["angles"]),
-                timestamp=float(lidar_item.get("timestamp", timestamp)),
-                frame_id=str(lidar_item.get("frame_id", "laser")),
-                intensities=lidar_item.get("intensities"),
-            )
-
-        return RobotFrame(
+    def _robot_frame_from_logged_signal(self, sensor, timestamp: float) -> RobotFrame:
+        encoder = EncoderState(
+            left_ticks=int(sensor.encoder_left_counts),
+            right_ticks=int(sensor.encoder_right_counts),
             timestamp=timestamp,
-            encoder=encoder,
-            lidar_scan=lidar_scan,
-            raw_packet=item.get("raw_packet"),
         )
 
-    def _landmark_observation_from_dict(self, item: dict) -> LandmarkObservation:
-        """Convert one project-specific dictionary into a LandmarkObservation."""
-        pose_item = item["robot_pose_meas"]
-        if isinstance(pose_item, Pose2D):
-            robot_pose_meas = pose_item
-        else:
-            robot_pose_meas = Pose2D(
-                x=float(pose_item.get("x", 0.0)),
-                y=float(pose_item.get("y", 0.0)),
-                theta=float(pose_item.get("theta", 0.0)),
+        lidar_scan = None
+        count = min(
+            int(getattr(sensor, "num_lidar_rays", 0)),
+            len(getattr(sensor, "angles", [])),
+            len(getattr(sensor, "distances", [])),
+        )
+        if count > 0:
+            ranges = [sensor.convert_hardware_distance(sensor.distances[i]) for i in range(count)]
+            angles = [sensor.convert_hardware_angle(sensor.angles[i]) for i in range(count)]
+            lidar_scan = LidarScan(
+                ranges=ranges,
+                angles=angles,
+                timestamp=timestamp,
+                frame_id="offline_hardware_lidar",
             )
 
+        return RobotFrame(timestamp=timestamp, encoder=encoder, lidar_scan=lidar_scan)
+
+    def _landmark_observations_from_camera_rows(
+        self,
+        camera_rows,
+        timestamp: float,
+    ) -> list[LandmarkObservation]:
+        observations: list[LandmarkObservation] = []
+        for pose_row in self._iter_camera_pose_rows(camera_rows):
+            obs = self._landmark_observation_from_pose_row(pose_row, timestamp)
+            if obs is not None:
+                observations.append(obs)
+        return observations
+
+    def _iter_camera_pose_rows(self, camera_rows):
+        if camera_rows is None:
+            return
+        if isinstance(camera_rows, (list, tuple)) and camera_rows:
+            first = camera_rows[0]
+            if isinstance(first, (list, tuple)):
+                for pose_row in camera_rows:
+                    if pose_row is not None and len(pose_row) >= 7:
+                        yield pose_row
+                return
+            if len(camera_rows) >= 7:
+                yield camera_rows
+
+    def _landmark_observation_from_pose_row(
+        self,
+        pose_row,
+        timestamp: float,
+    ) -> LandmarkObservation | None:
+        marker_id = int(pose_row[0])
+        if marker_id not in parameters.tags:
+            return None
+
+        x_cm = float(pose_row[1])
+        z_cm = float(pose_row[3])
+        yaw_rad = math.radians(float(pose_row[4]))
+
+        marker_x_m = parameters.tags[marker_id][0] / 100.0
+        marker_y_m = parameters.tags[marker_id][1] / 100.0
+        dx_robot_m = z_cm / 100.0
+        dy_robot_m = -x_cm / 100.0
+
+        robot_pose = Pose2D(
+            x=marker_x_m - dx_robot_m,
+            y=marker_y_m - dy_robot_m,
+            theta=-yaw_rad,
+        )
+        covariance = self._camera_covariance_from_pose_row(pose_row)
         return LandmarkObservation(
-            timestamp=float(item["timestamp"]),
-            marker_id=int(item["marker_id"]),
-            robot_pose_meas=robot_pose_meas,
-            covariance=np.asarray(item.get("covariance", np.eye(3)), dtype=float),
-            quality=item.get("quality"),
+            timestamp=timestamp,
+            marker_id=marker_id,
+            robot_pose_meas=robot_pose,
+            covariance=covariance,
+            quality={"source": "offline_camera_log"},
         )
 
-    def _sleep_for_replay(self) -> None:
-        """Throttle replay slightly so logs are easier to inspect."""
-        speed = max(self.config.runtime.offline_replay_speed, 1e-6)
-        time.sleep(0.01 / speed)
+    def _camera_covariance_from_pose_row(self, pose_row, rms_pixels: float = 0.6862) -> np.ndarray:
+        fx = parameters.camera_matrix[0, 0]
+        fy = parameters.camera_matrix[1, 1]
+        f_mean = (fx + fy) / 2.0
+        z_m = abs(float(pose_row[3]) / 100.0)
+        sigma_xy = max((rms_pixels * z_m) / f_mean, 0.02)
+        return np.diag([sigma_xy**2, sigma_xy**2, 0.05**2]).astype(np.float64)
+
+    def _force_backend_once(self) -> dict[int, Pose2D] | None:
+        if not self.slam.pose_graph.nodes:
+            return None
+        result = self.slam.optimizer.optimize(self.slam.pose_graph)
+        self.slam._last_optimized_trajectory = result
+        self.slam.latest_optimization_result = result
+        self.slam._rebuild_optimized_map(result)
+        return result
+
+
+def _latest_pickle() -> Path:
+    candidates = sorted(_PYTHON_DIR.joinpath("data").rglob("*.pkl"), key=lambda p: p.stat().st_mtime)
+    if not candidates:
+        raise FileNotFoundError("No .pkl files found under robot_python/data")
+    return candidates[-1]
 
 
 def main() -> None:
-    """Executable entry point for offline SLAM replay."""
-    runner = OfflineRunner()
+    parser = argparse.ArgumentParser(description="Replay a DataLogger pickle through SLAM offline.")
+    parser.add_argument("log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\robot_data_0_0_04_05_26_22_32_50.pkl")
+    parser.add_argument("--output", type=Path, default=_PYTHON_DIR / "offline_slam_plot.png")
+    parser.add_argument("--no-show", action="store_true")
+    parser.add_argument("--no-backend", action="store_true")
+    parser.add_argument("--delay", type=float, default=0.0, help="Optional sleep between replayed samples.")
+    args = parser.parse_args()
+
+    log_pickle = args.log_pickle or _latest_pickle()
+    runner = OfflineRunner(
+        log_pickle_path=log_pickle,
+        run_backend=not args.no_backend,
+        replay_delay_s=args.delay,
+    )
     runner.run()
+    runner.plot(output_path=args.output, show=not args.no_show)
 
 
 if __name__ == "__main__":

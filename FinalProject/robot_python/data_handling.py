@@ -53,52 +53,76 @@ def _unpack_traj_output(traj_output):
     )
 
 
+def _iter_camera_pose_rows(camera_row):
+    """Yield camera detections from one logged control-loop sample."""
+    if camera_row is None:
+        return
+    if isinstance(camera_row, (list, tuple)) and camera_row:
+        first = camera_row[0]
+        if isinstance(first, (list, tuple)):
+            for pose_row in camera_row:
+                if pose_row is not None and len(pose_row) >= 7:
+                    yield list(pose_row)
+            return
+        if len(camera_row) >= 7:
+            yield list(camera_row)
+
+
 # -----------------------------
 # File loading
 # -----------------------------
 def get_file_data(filename):
     """
-    Open a file and return data in a form ready to plot.
+    Open a logged robot pickle and return data aligned by timestamp.
 
     Expected dictionary keys in file:
-    ['time', 'control_signal', 'robot_sensor_signal', ...]
-    Camera data may be absent in some files, so we handle that safely.
+    ['time', 'control_signal', 'robot_sensor_signal', 'camera_sensor_signal', ...]
+
+    camera_detection_list[i] contains all camera detections associated with
+    time_list[i]:
+        [] if no markers were detected
+        [[marker_id, x_cm, y_cm, z_cm, yaw_deg, pitch_deg, roll_deg], ...]
     """
     data_loader = robot_code.DataLoader(filename)
     data_dict = data_loader.load()
 
-    time_list = data_dict.get('time', [])
-    control_signal_list = data_dict.get('control_signal', [])
-    robot_sensor_signal_list = data_dict.get('robot_sensor_signal', [])
-    camera_sensor_signal_list = data_dict.get('camera_sensor_signal', [])
+    raw_time_list = list(data_dict.get('time', []))
+    control_signal_list = list(data_dict.get('control_signal', []))
+    robot_sensor_signal_list = list(data_dict.get('robot_sensor_signal', []))
+    camera_sensor_signal_list = list(data_dict.get('camera_sensor_signal', []))
+
+    n = min(len(raw_time_list), len(robot_sensor_signal_list))
+    time_list = _normalize_time_list(raw_time_list[:n])
+    robot_sensor_signal_list = robot_sensor_signal_list[:n]
+    control_signal_list = [
+        control_signal_list[i] if i < len(control_signal_list) else None
+        for i in range(n)
+    ]
 
     encoder_left_count_list = []
     encoder_right_count_list = []
-    x_camera_list = []
-    y_camera_list = []
-    z_camera_list = []
-    yaw_camera_list = []
+    camera_detection_list = []
 
     for row in robot_sensor_signal_list:
-        encoder_left_count_list.append(row.encoder_left_counts)
-        encoder_right_count_list.append(row.encoder_right_counts)
+        if row is None:
+            encoder_left_count_list.append(None)
+            encoder_right_count_list.append(None)
+        else:
+            encoder_left_count_list.append(row.encoder_left_counts)
+            encoder_right_count_list.append(row.encoder_right_counts)
 
-    for row in camera_sensor_signal_list:
-        x_camera_list.append(row[0])
-        y_camera_list.append(row[1])
-        z_camera_list.append(row[2])
-        yaw_camera_list.append(row[5])
 
-    time_list = _normalize_time_list(list(time_list))
+    for i in range(n):
+        camera_row = camera_sensor_signal_list[i] if i < len(camera_sensor_signal_list) else []
+        camera_detection_list.append(list(_iter_camera_pose_rows(camera_row)))
 
     return (
         time_list,
+        robot_sensor_signal_list,
+        control_signal_list,
+        camera_detection_list,
         encoder_left_count_list,
         encoder_right_count_list,
-        x_camera_list,
-        y_camera_list,
-        z_camera_list,
-        yaw_camera_list,
     )
 
 

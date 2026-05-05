@@ -19,14 +19,14 @@ class DifferentialDriveMotionModel:
         """Convert a left-wheel encoder tick increment into travel distance."""
         # TODO: Replace this linear placeholder with a calibrated fitted
         # function from left encoder counts to left wheel travel distance.
-        s_L_slope = 0.00035210
+        s_L_slope = 0.00035698051573807086
         return delta_encoder * s_L_slope    
 
     def right_encoder_to_distance(self, delta_encoder: int) -> float:
         """Convert a right-wheel encoder tick increment into travel distance."""
         # TODO: Replace this linear placeholder with a calibrated fitted
         # function from right encoder counts to right wheel travel distance.
-        s_R_slope = 0.00035651
+        s_R_slope = 0.0003658445193934484
         return delta_encoder * s_R_slope
     
     ##Distance to sigma functions for left and right wheel distance predictions. We can use the residuals from our fitted functions to get an estimate of the variance of the distance predictions, which we can then use to construct the covariance matrix for the motion model.
@@ -62,7 +62,7 @@ class DifferentialDriveMotionModel:
 
         #based on differential drive model, we can compute the distance traveled and change in heading
         delta_s = 0.5 * (left_distance + right_distance)
-        delta_theta = (right_distance - left_distance) / self.config.wheel_base_m
+        delta_theta = (right_distance - left_distance) / parameters.wheel_base
 
         dx = delta_s * math.cos(0.5 * delta_theta)
         dy = delta_s * math.sin(0.5 * delta_theta)

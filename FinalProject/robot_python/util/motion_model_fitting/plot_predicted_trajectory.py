@@ -49,17 +49,18 @@ def predict_wheel_distance_over_time(filename):
     """
     (
         time_list,
+        robot_sensor_signal_list,
+        control_signal_list,
+        camera_detection_list,
         encoder_left_count_list,
         encoder_right_count_list,
-        velocity_left_list,
-        velocity_right_list,
-        steering_angle_list,
-        x_camera_list,
-        y_camera_list,
-        z_camera_list,
-        yaw_camera_list,
     ) = get_file_data(filename)
 
+    #print size of each of the lists to check they are the same
+    print(f"time_list size: {len(time_list)}")
+    print(f"encoder_left_count_list size: {len(encoder_left_count_list)}")
+    print(f"encoder_right_count_list size: {len(encoder_right_count_list)}")
+    
     if len(encoder_left_count_list) < 2 or len(encoder_right_count_list) < 2:
         raise ValueError("Not enough encoder data in this file.")
 
@@ -201,5 +202,5 @@ def run_one_file(filename):
 # -----------------------------
 # CHOOSE FILE HERE
 # -----------------------------
-filename_to_run = "C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\trial runs\\t0-t5\\robot_data_0_0_04_05_26_02_55_52.pkl"
+filename_to_run = "C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\robot_data_0_0_04_05_26_22_32_50.pkl"
 run_one_file(filename_to_run)

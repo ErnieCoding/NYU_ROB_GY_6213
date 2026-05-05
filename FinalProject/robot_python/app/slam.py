@@ -63,7 +63,7 @@ class SLAMSystem:
                 robot_frame.lidar_scan,
                 init_guess=pose_estimate.pose,
             )
-            pose_estimate = self.ekf.correct_with_lidar(lidar_motion)
+            # pose_estimate = self.ekf.correct_with_lidar(lidar_motion)
 
         pose_estimate.timestamp = robot_frame.timestamp
         created_keyframe = self._maybe_add_keyframe(pose_estimate, odom_motion, lidar_motion, robot_frame)

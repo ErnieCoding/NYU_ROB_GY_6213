@@ -57,7 +57,7 @@ class FrontendConfig:
 
     icp_max_iterations: int = 25
     icp_convergence_tolerance: float = 1e-4
-    icp_max_correspondence_distance_m: float = 0.35
+    icp_max_correspondence_distance_m: float = 0.215
     lidar_downsample_step: int = 1
     initial_covariance: float = 0.1 # state covariance
     keyframe_translation_m: float = 0.05 # add keyframe every 5 cm
