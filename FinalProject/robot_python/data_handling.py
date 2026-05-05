@@ -3,11 +3,20 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import math
 import numpy as np
+import sys
 
 # Internal Libraries
-import FinalProject.robot_python.parameters as parameters
+# import FinalProject.robot_python.parameters as parameters
 import robot_code
-# import motion_models
+
+_APP_DIR     = Path(__file__).resolve().parent
+_PYTHON_DIR  = _APP_DIR.parent
+_PROJECT_DIR = _PYTHON_DIR.parent
+_ROOT_DIR    = _PROJECT_DIR.parent
+
+for _p in [str(_ROOT_DIR), str(_PROJECT_DIR), str(_PYTHON_DIR), str(_APP_DIR)]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 
 # -----------------------------
@@ -867,12 +876,13 @@ files_and_data_spinning = [
 if __name__ == "__main__":
     # Plot the motion model predictions for a single trial
     if True:
-        filename = './data/robot_data_0_0_02_05_26_23_38_34.pkl'
+        filename = '/home/ernest/Desktop/NYU_ROB_GY_6213/FinalProject/robot_python/data/trial runs/robot_data_0_0_03_05_26_19_01_49.pkl'
         data = get_file_data(filename)
         encoder_left, encoder_right = data[1], data[2]
+        camera_x, camera_y, camera_z = data[6], data[7], data[8]
 
-        for i in range(len(encoder_left)):
-            print(f"LEFT Encoder: {encoder_left[i]}\t||\tRIGHT Encoder: {encoder_right[i]}")
+        for i in range(len(camera_x)):
+            print(f"[CAMERA] X: {camera_x} || Y: {camera_y} || Z: {camera_z}\n")
 
     # Plot the motion model predictions for each trial in a folder
     if False:

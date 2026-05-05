@@ -10,9 +10,11 @@ import matplotlib.pyplot as plt
 import socket
 from time import strftime
 import threading
-
+from pathlib import Path
+import sys
+import data_types
 # Parameters
-from FinalProject.robot_python import parameters
+import parameters
 
 
 # ---- MAIN ROBOT CLASS ---- 
@@ -277,14 +279,16 @@ class CameraSensor:
         self.aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_5X5_250)
         self.parameters = aruco.DetectorParameters()
         self.detector = aruco.ArucoDetector(self.aruco_dict, self.parameters)
+        self.landmark_observations = []
 
         self._lock = threading.Lock()
         self._latest_raw_frame = None
         self._latest_annotated_frame = None
-        self._latest_pose = None
+        self._latest_pose = [None, None, None, None, None, None, None]
         self._running = True
         self._thread = threading.Thread(target=self._capture_loop, daemon=True)
         self._thread.start()
+        self._latest_pose_by_id = {}
     
     def _capture_loop(self):
         while self._running:
@@ -369,7 +373,26 @@ class CameraSensor:
                     )
 
                     
-                    pose_result = [x_cm, y_cm, z_cm, yaw, pitch, roll]
+                    pose_result = [marker_id, x_cm, y_cm, z_cm, yaw, pitch, roll]
+
+                    with self._lock:
+                        last = self._latest_pose_by_id.get(marker_id)
+                    
+
+                    # TODO: Fill in camera variance
+                    tvec_m = tvec / 100.0;
+                    cov = self.get_camera_covariance(tvec_m)
+                    if last is None or x_cm != self._latest_pose[1] or z_cm != self._latest_pose[3]:
+                        robot_pose = self.marker_to_robot_pose(pose_result)
+                        obs = data_types.LandmarkObservation(
+                                timestamp=time.perf_counter(),
+                                marker_id=marker_id, 
+                                robot_pose_meas=robot_pose, 
+                                covariance=cov
+                            )
+
+                        with self._lock:
+                            self.landmark_observations.append(obs) 
 
             # --- Atomically store results ---
             with self._lock:
@@ -379,6 +402,35 @@ class CameraSensor:
 
             time.sleep(0.05)
 
+    def marker_to_robot_pose(self, pose):
+        marker_id = pose[0]
+        camera_x = pose[1]
+        camera_z = pose[3]
+        yaw_rad = math.radians(pose[4])
+
+        dx_robot = camera_z
+        dy_robot = -camera_x
+
+        x_robot = parameters.tags[marker_id][0] - dx_robot
+        y_robot = parameters.tags[marker_id][1] - dy_robot
+        theta_robot = -yaw_rad
+
+        return data_types.Pose2D(x_robot, y_robot, theta_robot)
+  
+    def get_camera_covariance(self, tvec, rms_pixels=0.6862):
+        fx = parameters.camera_matrix[0, 0]  # 348.03
+        fy = parameters.camera_matrix[1, 1]  # 355.60
+        f_mean = (fx + fy) / 2.0             # ~351.8 px
+
+        z_cam = abs(tvec[2])                 # depth in meters
+        sigma_xy = (rms_pixels * z_cam) / f_mean
+
+        # Clamp to a minimum floor (e.g., 2 cm) — calibration RMS is optimistic
+        sigma_xy = max(sigma_xy, 0.02)
+
+        return np.diag([sigma_xy**2, sigma_xy**2, 0.05**2]).astype(np.float64)
+
+    
     def get_latest_frame(self):
         with self._lock:
             frame = self._latest_annotated_frame

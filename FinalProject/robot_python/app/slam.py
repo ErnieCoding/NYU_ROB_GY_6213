@@ -40,6 +40,9 @@ class SLAMSystem:
         self._new_keyframes_since_optimization = 0
         self._last_optimization_time = time.time()
 
+        self.latest_frontend_output: FrontendOutput | None = None
+        self.latest_optimization_result: dict[int, Pose2D] | None = None
+
     def run_frontend(self, robot_frame: RobotFrame) -> FrontendOutput:
         """Run front-end prediction, LiDAR correction, and local map update."""
         odom_motion = None
@@ -67,7 +70,7 @@ class SLAMSystem:
         self._update_local_map(pose_estimate, robot_frame, self._latest_keyframe_id if created_keyframe else None)
         self._prev_robot_frame = robot_frame
 
-        return FrontendOutput(
+        output = FrontendOutput(
             timestamp=robot_frame.timestamp,
             pose_estimate=pose_estimate,
             odom_motion=odom_motion,
@@ -75,6 +78,8 @@ class SLAMSystem:
             created_keyframe=created_keyframe,
             keyframe_id=self._latest_keyframe_id if created_keyframe else None,
         )
+        self.latest_frontend_output = output
+        return output
 
     def add_landmark_observation(self, obs: LandmarkObservation) -> bool:
         """Attach one processed landmark observation to the nearest keyframe."""
@@ -93,6 +98,7 @@ class SLAMSystem:
             return None
 
         self._last_optimized_trajectory = self.optimizer.optimize(self.pose_graph)
+        self.latest_optimization_result = self._last_optimized_trajectory
         self._rebuild_optimized_map(self._last_optimized_trajectory)
         self._new_keyframes_since_optimization = 0
         self._last_optimization_time = time.time()
