@@ -198,25 +198,35 @@ class OfflineRunner:
         )
         print("========================================\n")
 
-    def plot(self, output_path: str | Path | None = None, show: bool = True) -> None:
-        """Plot room geometry, SLAM trajectory, and live/optimized map points."""
+    def plot(
+        self,
+        output_path: str | Path | None = None,
+        show: bool = True,
+        ground_truth_final_pos: tuple[float, float] | None = None,
+    ) -> None:
+        """Plot room geometry, SLAM trajectory, and live/optimized map points.
+
+        ground_truth_final_pos: (x, y) in metres. When provided, the true final
+        position is marked and final-position errors for EKF and optimised
+        trajectory are printed beneath the plot.
+        """
         import matplotlib.pyplot as plt
 
         local_map = self.slam.get_current_local_map()
         optimized = self.slam.get_current_global_trajectory()
 
         fig, ax = plt.subplots(figsize=(10, 7))
-        ax.set_facecolor("#0d0d0d")
-        fig.patch.set_facecolor("#0d0d0d")
+        ax.set_facecolor("white")
+        fig.patch.set_facecolor("white")
 
         for wall in parameters.walls:
             x1, y1 = parameters.corners[wall[0]]
             x2, y2 = parameters.corners[wall[1]]
-            ax.plot([x1, x2], [y1, y2], color="#e0e0e0", linewidth=1.5)
+            ax.plot([x1, x2], [y1, y2], color="black", linewidth=2.0, label="_nolegend_")
 
         for tag_id, (tx, ty) in parameters.tags.items():
-            ax.scatter(tx, ty, color="#ff4444", s=35, marker="D")
-            ax.text(tx + 3, ty + 3, f"T{tag_id}", fontsize=7, color="#ff9999")
+            ax.scatter(tx, ty, color="black", s=40, marker="D", zorder=5)
+            ax.text(tx + 3, ty + 3, f"T{tag_id}", fontsize=7, color="black")
 
         map_points = (
             local_map.optimized_map_points
@@ -226,42 +236,72 @@ class OfflineRunner:
         if map_points:
             xs = [p[0] * 100.0 for p in map_points]
             ys = [p[1] * 100.0 for p in map_points]
-            color = "#69ff47" if local_map.optimized_map_points else "#00e5ff"
+            color = "#cc0000" if local_map.optimized_map_points else "#00b4cc"
             label = "optimized map" if local_map.optimized_map_points else "frontend map"
-            ax.scatter(xs, ys, s=1.2, c=color, alpha=0.35, linewidths=0, label=label)
+            ax.scatter(xs, ys, s=6.0, c=color, alpha=0.6, linewidths=0, label=label)
 
+        ekf_final_cm: tuple[float, float] | None = None
         if local_map.trajectory:
             tx = [estimate.pose.x * 100.0 for estimate in local_map.trajectory]
             ty = [estimate.pose.y * 100.0 for estimate in local_map.trajectory]
-            ax.plot(tx, ty, color="#ffd600", linewidth=1.4, label="EKF trajectory")
-            ax.scatter(tx[0], ty[0], color="#ffffff", s=45, label="start")
-            ax.scatter(tx[-1], ty[-1], color="#ff6d00", s=45, label="end")
+            ax.plot(tx, ty, color="#0055cc", linewidth=1.4, label="EKF trajectory")
+            ax.scatter(tx[0], ty[0], color="#333333", s=50, zorder=6, label="start")
+            ax.scatter(tx[-1], ty[-1], color="#cc3300", s=50, zorder=6, label="end")
+            ekf_final_cm = (tx[-1], ty[-1])
 
+        opt_final_cm: tuple[float, float] | None = None
         if optimized:
             ids = sorted(optimized)
             ox = [optimized[node_id].x * 100.0 for node_id in ids]
             oy = [optimized[node_id].y * 100.0 for node_id in ids]
-            ax.plot(ox, oy, color="#69ff47", linewidth=1.8, label="optimized trajectory")
+            ax.plot(ox, oy, color="#22bb00", linewidth=1.8, label="optimized trajectory")
+            opt_final_cm = (ox[-1], oy[-1])
 
         if local_map.landmark_observations:
             lx = [obs.robot_pose_meas.x * 100.0 for obs in local_map.landmark_observations]
             ly = [obs.robot_pose_meas.y * 100.0 for obs in local_map.landmark_observations]
-            ax.scatter(lx, ly, color="#aa00ff", s=18, alpha=0.6, label="camera pose measurements")
+            ax.scatter(lx, ly, color="#7700cc", s=18, alpha=0.6, label="camera pose measurements")
+
+        error_lines: list[str] = []
+        if ground_truth_final_pos is not None:
+            gt_x_cm = ground_truth_final_pos[0] * 100.0
+            gt_y_cm = ground_truth_final_pos[1] * 100.0
+            ax.scatter(gt_x_cm, gt_y_cm, color="black", s=120, marker="*", zorder=7, label="ground truth final")
+
+            if ekf_final_cm is not None:
+                ekf_err = math.hypot(ekf_final_cm[0] - gt_x_cm, ekf_final_cm[1] - gt_y_cm)
+                error_lines.append(f"EKF final pos. error:       {ekf_err:.1f} cm  ({ekf_err / 100:.3f} m)")
+
+            if opt_final_cm is not None:
+                opt_err = math.hypot(opt_final_cm[0] - gt_x_cm, opt_final_cm[1] - gt_y_cm)
+                error_lines.append(f"Optimized final pos. error: {opt_err:.1f} cm  ({opt_err / 100:.3f} m)")
 
         all_x = [p[0] for p in parameters.corners.values()] + [p[0] for p in parameters.tags.values()]
         all_y = [p[1] for p in parameters.corners.values()] + [p[1] for p in parameters.tags.values()]
         ax.set_xlim(min(all_x) - 20, max(all_x) + 20)
         ax.set_ylim(min(all_y) - 20, max(all_y) + 20)
         ax.set_aspect("equal", adjustable="box")
-        ax.set_xlabel("x (cm)", color="#dddddd")
-        ax.set_ylabel("y (cm)", color="#dddddd")
-        ax.tick_params(colors="#dddddd")
-        ax.legend(facecolor="#181818", edgecolor="#555555", labelcolor="#eeeeee")
-        ax.set_title(self.log_pickle_path.name, color="#eeeeee")
+        ax.set_xlabel("x (cm)", color="black")
+        ax.set_ylabel("y (cm)", color="black")
+        ax.tick_params(colors="black")
+        ax.legend(facecolor="white", edgecolor="#aaaaaa", labelcolor="black")
+        ax.set_title(self.log_pickle_path.name, color="black")
+
+        if error_lines:
+            ax.text(
+                0.02, 0.98,
+                "\n".join(error_lines),
+                transform=ax.transAxes,
+                ha="left", va="top",
+                fontsize=9, family="monospace", color="black",
+                bbox=dict(boxstyle="round,pad=0.4", facecolor="#f0f0f0", edgecolor="#888888", alpha=0.9),
+                zorder=10,
+            )
+
         fig.tight_layout()
 
         if output_path is not None:
-            fig.savefig(output_path, dpi=160)
+            fig.savefig(output_path, dpi=160, bbox_inches="tight")
             print(f"Saved offline SLAM plot to {output_path}")
 
         if show:
@@ -414,13 +454,18 @@ def _latest_pickle() -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a DataLogger pickle through SLAM offline.")
-    parser.add_argument("log_pickle", nargs="?", type=Path, default="/home/ernest/Desktop/NYU_ROB_GY_6213/FinalProject/robot_python/data/trial runs/t0-t12/robot_data_0_0_04_05_26_02_59_22.pkl")
+    parser.add_argument("log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\final_trials\\robot_data_0_0_05_05_26_05_29_29.pkl")
     parser.add_argument("--output", type=Path, default=_PYTHON_DIR / "offline_slam_plot.png")
     parser.add_argument("--no-show", action="store_true")
     parser.add_argument("--no-backend", action="store_true")
     parser.add_argument("--delay", type=float, default=0.0, help="Optional sleep between replayed samples.")
+    parser.add_argument(
+        "--gt-final", nargs=2, type=float, metavar=("X", "Y"), default=None,
+        help="Ground truth final position in metres, e.g. --gt-final 1.20 0.85",
+    )
     args = parser.parse_args()
 
+    gt_final = tuple(args.gt_final) if args.gt_final is not None else None
     log_pickle = args.log_pickle or _latest_pickle()
     runner = OfflineRunner(
         log_pickle_path=log_pickle,
@@ -428,7 +473,7 @@ def main() -> None:
         replay_delay_s=args.delay,
     )
     runner.run()
-    runner.plot(output_path=args.output, show=not args.no_show)
+    runner.plot(output_path=args.output, show=not args.no_show, ground_truth_final_pos=gt_final)
 
 
 if __name__ == "__main__":
