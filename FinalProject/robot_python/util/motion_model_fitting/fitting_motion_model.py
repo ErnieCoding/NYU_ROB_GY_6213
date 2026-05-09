@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from fitting_data import*
@@ -53,6 +54,9 @@ def compute_r2(y_true, y_pred):
 
 
 def fitting_motion_model(files_and_data):
+    plots_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "motion_model_plots")
+    os.makedirs(plots_dir, exist_ok=True)
+
     # -----------------------------
     # STORAGE
     # -----------------------------
@@ -63,6 +67,9 @@ def fitting_motion_model(files_and_data):
 
     motion_type_list = []
     filename_list = []
+
+    x_gt_list = []
+    y_gt_list = []
 
     # -----------------------------
     # LOOP THROUGH DATA
@@ -155,6 +162,8 @@ def fitting_motion_model(files_and_data):
 
         motion_type_list.append(motion_type)
         filename_list.append(d["filename"])
+        x_gt_list.append(x)
+        y_gt_list.append(y)
 
         # # store
         # eL_list.append(d_eL)
@@ -169,6 +178,8 @@ def fitting_motion_model(files_and_data):
     eR = np.array(eR_list)
     sL = np.array(sL_true_list)
     sR = np.array(sR_true_list)
+    x_gt = np.array(x_gt_list)
+    y_gt = np.array(y_gt_list)
 
 
     print("\nData summary:")
@@ -196,6 +207,26 @@ def fitting_motion_model(files_and_data):
     sL_pred = k_L * eL
     sR_pred = k_R * eR
 
+    # Position error: compare estimated chord length to measured chord length.
+    # Using arc-to-chord conversion avoids needing the heading coordinate frame.
+    # chord = arc * |sin(Δθ/2)| / (|Δθ|/2)  →  reduces to arc when Δθ → 0.
+    s_center = (sL_pred + sR_pred) / 2
+    delta_theta_est = (sR_pred - sL_pred) / b
+    chord_est = np.where(
+        np.abs(delta_theta_est) < 1e-6,
+        s_center,
+        s_center * np.abs(np.sin(delta_theta_est / 2)) / (np.abs(delta_theta_est) / 2)
+    )
+    s_gt_chord = np.sqrt(x_gt**2 + y_gt**2)
+    pos_error = np.abs(chord_est - s_gt_chord)
+
+    # Center displacement reusing calibration GT values — no new assumptions:
+    #   straight  → (s_true + s_true) / 2  = sqrt(x²+y²)
+    #   arc       → (s_outer + s_inner) / 2 = R·|Δθ|  (center arc length)
+    #   rotation  → (-s_mag + s_mag) / 2   = 0
+    s_gt_center = (sL + sR) / 2
+    s_est_center = (sL_pred + sR_pred) / 2
+
     # -----------------------------
     # ERRORS
     # -----------------------------
@@ -222,7 +253,7 @@ def fitting_motion_model(files_and_data):
     plt.subplot(1,2,1)
     plt.scatter(eL, sL, label="True")
     plt.plot(eL, sL_pred, color='red', label="Fit")
-    plt.title("Left Wheel-Distance(True-dots and Predicted-Line) vs Encoder Change")
+    plt.title("Left Wheel Distance vs Encoder Change")
     plt.xlabel("Encoder Δ")
     plt.ylabel("Distance (m)")
     plt.legend()
@@ -231,12 +262,13 @@ def fitting_motion_model(files_and_data):
     plt.subplot(1,2,2)
     plt.scatter(eR, sR, label="True")
     plt.plot(eR, sR_pred, color='red', label="Fit")
-    plt.title("Right Wheel--Distance(True-dots and Predicted-Line) vs Encoder Change")
+    plt.title("Right Wheel Distance vs Encoder Change")
     plt.xlabel("Encoder Δ")
     plt.ylabel("Distance (m)")
     plt.legend()
 
     plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "encoder_fit.png"), dpi=150)
     plt.show()
 
     print(f"s_L = {k_L:.8f} * Δe_L")
@@ -335,12 +367,8 @@ def fitting_motion_model(files_and_data):
     # LEFT
     plt.subplot(1, 2, 1)
     plt.scatter(xL, err2_L, label="Data")
-
-    plt.plot(x_plot, np.full_like(x_plot, const_L), label="Constant")
-    plt.plot(x_plot, aL_lin*x_plot + bL_lin, label="Linear")
-    plt.plot(x_plot, aL*x_plot**2 + bL*x_plot + cL, label="Quadratic")
-
-    plt.title("Left variance comparison")
+    plt.plot(x_plot, aL*x_plot**2 + bL*x_plot + cL, color='orange', label="Quadratic")
+    plt.title("Left Wheel Variance (Quadratic Fit)")
     plt.xlabel("|distance|")
     plt.ylabel("error²")
     plt.legend()
@@ -349,18 +377,46 @@ def fitting_motion_model(files_and_data):
     # RIGHT
     plt.subplot(1, 2, 2)
     plt.scatter(xR, err2_R, label="Data")
-
-    plt.plot(x_plot, np.full_like(x_plot, const_R), label="Constant")
-    plt.plot(x_plot, aR_lin*x_plot + bR_lin, label="Linear")
-    plt.plot(x_plot, aR*x_plot**2 + bR*x_plot + cR, label="Quadratic")
-
-    plt.title("Right variance comparison")
+    plt.plot(x_plot, aR*x_plot**2 + bR*x_plot + cR, color='orange', label="Quadratic")
+    plt.title("Right Wheel Variance (Quadratic Fit)")
     plt.xlabel("|distance|")
     plt.ylabel("error²")
     plt.legend()
     plt.grid(True)
 
     plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "variance_quadratic.png"), dpi=150)
+    plt.show()
+
+    # -----------------------------
+    # FINAL POSITION ERROR PER TRIAL
+    # -----------------------------
+    trial_labels = [f.replace('.json', '') for f in filename_list]
+    plt.figure(figsize=(max(10, len(pos_error) * 0.6), 4))
+    plt.bar(np.arange(len(pos_error)), pos_error, color='steelblue')
+    plt.xticks(np.arange(len(pos_error)), trial_labels, rotation=45, ha='right', fontsize=7)
+    plt.xlabel("Trial")
+    plt.ylabel("Position error (m)")
+    plt.title("Final Position Error per Trial  —  $e_i = |chord_{est} - chord_{gt}|$")
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "final_position_error.png"), dpi=150)
+    plt.show()
+
+    # -----------------------------
+    # PREDICTED vs GROUND TRUTH DISPLACEMENT
+    # -----------------------------
+    plt.figure(figsize=(6, 6))
+    plt.scatter(s_gt_center, s_est_center, color='steelblue', zorder=5, label="Trials")
+    lim_min = min(s_gt_center.min(), s_est_center.min()) - 0.01
+    lim_max = max(s_gt_center.max(), s_est_center.max()) + 0.01
+    plt.plot([lim_min, lim_max], [lim_min, lim_max], 'r--', label="Ideal (y = x)")
+    plt.xlabel("Ground truth displacement  $s^{gt}$ (m)")
+    plt.ylabel("Predicted displacement  $s^{est}$ (m)")
+    plt.title("Predicted vs Ground Truth Displacement")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, "predicted_vs_gt_displacement.png"), dpi=150)
     plt.show()
 
 

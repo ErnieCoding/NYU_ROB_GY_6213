@@ -203,12 +203,15 @@ class OfflineRunner:
         output_path: str | Path | None = None,
         show: bool = True,
         ground_truth_final_pos: tuple[float, float] | None = None,
+        ground_truth_trajectory: list[tuple[float, float]] | None = None,
     ) -> None:
         """Plot room geometry, SLAM trajectory, and live/optimized map points.
 
         ground_truth_final_pos: (x, y) in metres. When provided, the true final
         position is marked and final-position errors for EKF and optimised
         trajectory are printed beneath the plot.
+
+        ground_truth_trajectory: manually specified trajectory points in cm.
         """
         import matplotlib.pyplot as plt
 
@@ -262,10 +265,31 @@ class OfflineRunner:
             ly = [obs.robot_pose_meas.y * 100.0 for obs in local_map.landmark_observations]
             ax.scatter(lx, ly, color="#7700cc", s=18, alpha=0.6, label="camera pose measurements")
 
+        gt_traj_x: list[float] = []
+        gt_traj_y: list[float] = []
+        if ground_truth_trajectory:
+            gt_traj_x = [p[0] for p in ground_truth_trajectory]
+            gt_traj_y = [p[1] for p in ground_truth_trajectory]
+            ax.plot(
+                gt_traj_x,
+                gt_traj_y,
+                color="purple",
+                linestyle="--",
+                linewidth=2.0,
+                label="estimated ground truth trajectory",
+            )
+            ax.scatter(gt_traj_x[0], gt_traj_y[0], color="green", s=65, zorder=7, label="gt start")
+            ax.scatter(gt_traj_x[-1], gt_traj_y[-1], color="purple", s=65, zorder=7, label="gt end")
+
         error_lines: list[str] = []
+        gt_final_cm: tuple[float, float] | None = None
         if ground_truth_final_pos is not None:
-            gt_x_cm = ground_truth_final_pos[0] * 100.0
-            gt_y_cm = ground_truth_final_pos[1] * 100.0
+            gt_final_cm = (ground_truth_final_pos[0] * 100.0, ground_truth_final_pos[1] * 100.0)
+        elif ground_truth_trajectory:
+            gt_final_cm = ground_truth_trajectory[-1]
+
+        if gt_final_cm is not None:
+            gt_x_cm, gt_y_cm = gt_final_cm
             ax.scatter(gt_x_cm, gt_y_cm, color="black", s=120, marker="*", zorder=7, label="ground truth final")
 
             if ekf_final_cm is not None:
@@ -278,6 +302,8 @@ class OfflineRunner:
 
         all_x = [p[0] for p in parameters.corners.values()] + [p[0] for p in parameters.tags.values()]
         all_y = [p[1] for p in parameters.corners.values()] + [p[1] for p in parameters.tags.values()]
+        all_x += gt_traj_x
+        all_y += gt_traj_y
         ax.set_xlim(min(all_x) - 20, max(all_x) + 20)
         ax.set_ylim(min(all_y) - 20, max(all_y) + 20)
         ax.set_aspect("equal", adjustable="box")
@@ -452,9 +478,68 @@ def _latest_pickle() -> Path:
     return candidates[-1]
 
 
+def _parse_map_waypoint(text: str) -> tuple[float, float]:
+    """Parse a waypoint in cm from a corner label, tag label, or x,y string."""
+    value = text.strip()
+    if value in parameters.corners:
+        x, y = parameters.corners[value]
+        return float(x), float(y)
+
+    if value.upper().startswith("T") and value[1:].isdigit():
+        tag_id = int(value[1:])
+        if tag_id in parameters.tags:
+            x, y = parameters.tags[tag_id]
+            return float(x), float(y)
+
+    parts = value.split(",")
+    if len(parts) == 2:
+        return float(parts[0]), float(parts[1])
+
+    raise ValueError(f"Unknown ground-truth trajectory waypoint: {text}")
+
+
+def _make_robot_like_polyline(
+    waypoints: list[tuple[float, float]],
+    step_cm: float,
+    wobble_cm: float,
+) -> list[tuple[float, float]]:
+    """Create a segmented non-smoothed trajectory through manual waypoints."""
+    if len(waypoints) < 2:
+        return waypoints[:]
+
+    path: list[tuple[float, float]] = [waypoints[0]]
+    for segment_index, (start, end) in enumerate(zip(waypoints, waypoints[1:])):
+        x0, y0 = start
+        x1, y1 = end
+        dx = x1 - x0
+        dy = y1 - y0
+        length = math.hypot(dx, dy)
+        if length <= 1e-9:
+            continue
+
+        nx = -dy / length
+        ny = dx / length
+        steps = max(1, int(math.ceil(length / max(step_cm, 1e-6))))
+
+        for i in range(1, steps + 1):
+            t = i / steps
+            base_x = x0 + t * dx
+            base_y = y0 + t * dy
+            if i == steps:
+                path.append((x1, y1))
+                continue
+
+            zigzag = -1.0 if (i + segment_index) % 2 == 0 else 1.0
+            taper = math.sin(math.pi * t)
+            offset = wobble_cm * zigzag * taper
+            path.append((base_x + offset * nx, base_y + offset * ny))
+
+    return path
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a DataLogger pickle through SLAM offline.")
-    parser.add_argument("log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\final_trials\\robot_data_0_0_05_05_26_05_29_29.pkl")
+    parser.add_argument("--log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\final_trials\\robot_data_0_0_05_05_26_05_29_29.pkl")
     parser.add_argument("--output", type=Path, default=_PYTHON_DIR / "offline_slam_plot.png")
     parser.add_argument("--no-show", action="store_true")
     parser.add_argument("--no-backend", action="store_true")
@@ -463,9 +548,26 @@ def main() -> None:
         "--gt-final", nargs=2, type=float, metavar=("X", "Y"), default=None,
         help="Ground truth final position in metres, e.g. --gt-final 1.20 0.85",
     )
+    parser.add_argument(
+        "--gt-traj",
+        nargs="+",
+        default=None,
+        help="Manual ground-truth trajectory waypoints in cm, e.g. --gt-traj 20,20 22,170 T7.",
+    )
+    parser.add_argument("--gt-traj-step-cm", type=float, default=12.0)
+    parser.add_argument("--gt-traj-wobble-cm", type=float, default=2.5)
     args = parser.parse_args()
 
     gt_final = tuple(args.gt_final) if args.gt_final is not None else None
+    gt_trajectory = None
+    if args.gt_traj is not None:
+        gt_waypoints = [_parse_map_waypoint(point) for point in args.gt_traj]
+        gt_trajectory = _make_robot_like_polyline(
+            gt_waypoints,
+            step_cm=args.gt_traj_step_cm,
+            wobble_cm=args.gt_traj_wobble_cm,
+        )
+
     log_pickle = args.log_pickle or _latest_pickle()
     runner = OfflineRunner(
         log_pickle_path=log_pickle,
@@ -473,7 +575,12 @@ def main() -> None:
         replay_delay_s=args.delay,
     )
     runner.run()
-    runner.plot(output_path=args.output, show=not args.no_show, ground_truth_final_pos=gt_final)
+    runner.plot(
+        output_path=args.output,
+        show=not args.no_show,
+        ground_truth_final_pos=gt_final,
+        ground_truth_trajectory=gt_trajectory,
+    )
 
 
 if __name__ == "__main__":
