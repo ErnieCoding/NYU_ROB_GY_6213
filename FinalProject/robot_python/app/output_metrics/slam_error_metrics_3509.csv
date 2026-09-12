@@ -1,0 +1,7 @@
+metric,value
+map_num_points,2227
+map_mean_cm,30.40393931207842
+map_median_cm,14.952744055608946
+map_rmse_cm,80.30999836765515
+map_p95_cm,136.52754615406184
+map_max_cm,885.9962674150873

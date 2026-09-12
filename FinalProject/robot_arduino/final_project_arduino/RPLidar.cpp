@@ -53,6 +53,7 @@ bool RPLidar::begin(HardwareSerial &serialobj)
     _bined_serialdev = &serialobj;
     _bined_serialdev->end();
     _bined_serialdev->begin(RPLIDAR_SERIAL_BAUDRATE);
+    return true;
 }
 
 // close the currently opened serial interface

@@ -537,9 +537,170 @@ def _make_robot_like_polyline(
     return path
 
 
+# ================= Added evaluation helpers =================
+def _point_to_segment_distance_cm(point_xy, seg_a, seg_b):
+    import math
+    px, py = point_xy
+    ax, ay = seg_a
+    bx, by = seg_b
+    abx = bx - ax
+    aby = by - ay
+    apx = px - ax
+    apy = py - ay
+    denom = abx * abx + aby * aby
+    if denom <= 1e-12:
+        return math.hypot(px - ax, py - ay)
+    t = max(0.0, min(1.0, (apx * abx + apy * aby) / denom))
+    qx = ax + t * abx
+    qy = ay + t * aby
+    return math.hypot(px - qx, py - qy)
+
+
+def _maze_segments_cm():
+    segments = []
+    for wall in parameters.walls:
+        a = parameters.corners[wall[0]]
+        b = parameters.corners[wall[1]]
+        segments.append(((float(a[0]), float(a[1])), (float(b[0]), float(b[1]))))
+    return segments
+
+
+def _safe_pose_xy_theta(obj):
+    if obj is None:
+        return None
+    pose = getattr(obj, 'pose', obj)
+    x = getattr(pose, 'x', None)
+    y = getattr(pose, 'y', None)
+    theta = getattr(pose, 'theta', None)
+    if callable(x):
+        x = x()
+    if callable(y):
+        y = y()
+    if callable(theta):
+        theta = theta()
+    if x is None or y is None:
+        return None
+    return float(x), float(y), None if theta is None else float(theta)
+
+
+def _safe_timestamp(obj):
+    if obj is None:
+        return None
+    for name in ('timestamp', 'time', 't'):
+        if hasattr(obj, name):
+            val = getattr(obj, name)
+            return float(val() if callable(val) else val)
+    pose = getattr(obj, 'pose', None)
+    if pose is not None:
+        for name in ('timestamp', 'time', 't'):
+            if hasattr(pose, name):
+                val = getattr(pose, name)
+                return float(val() if callable(val) else val)
+    return None
+
+
+def compute_map_error_metrics(runner):
+    local_map = runner.slam.get_current_local_map()
+    map_points = local_map.optimized_map_points if local_map.optimized_map_points else local_map.map_points
+    if not map_points:
+        return None
+    segs = _maze_segments_cm()
+    distances_cm = []
+    for p in map_points:
+        px = float(p[0]) * 100.0
+        py = float(p[1]) * 100.0
+        d = min(_point_to_segment_distance_cm((px, py), a, b) for a, b in segs)
+        distances_cm.append(d)
+    arr = np.asarray(distances_cm, dtype=float)
+    return {
+        'num_points': int(arr.size),
+        'mean_cm': float(arr.mean()),
+        'median_cm': float(np.median(arr)),
+        'rmse_cm': float(np.sqrt(np.mean(arr ** 2))),
+        'p95_cm': float(np.percentile(arr, 95)),
+        'max_cm': float(arr.max()),
+        'distances_cm': arr,
+    }
+
+
+def compute_landmark_pose_residual_metrics(runner):
+    import math
+    local_map = runner.slam.get_current_local_map()
+    observations = getattr(local_map, 'landmark_observations', None) or []
+    traj = getattr(local_map, 'trajectory', None) or []
+    if not observations or not traj:
+        return None
+    traj_entries = []
+    for item in traj:
+        pose = _safe_pose_xy_theta(item)
+        ts = _safe_timestamp(item)
+        if pose is not None and ts is not None:
+            traj_entries.append((ts, pose))
+    if not traj_entries:
+        return None
+    residuals_cm = []
+    yaw_residuals_deg = []
+    for obs in observations:
+        obs_pose = _safe_pose_xy_theta(getattr(obs, 'robot_pose_meas', None))
+        obs_ts = _safe_timestamp(obs)
+        if obs_pose is None or obs_ts is None:
+            continue
+        _, pose_best = min(traj_entries, key=lambda item: abs(item[0] - obs_ts))
+        dx = (obs_pose[0] - pose_best[0]) * 100.0
+        dy = (obs_pose[1] - pose_best[1]) * 100.0
+        residuals_cm.append(math.hypot(dx, dy))
+        if obs_pose[2] is not None and pose_best[2] is not None:
+            yaw_residuals_deg.append(abs(math.degrees(normalize_angle(obs_pose[2] - pose_best[2]))))
+    if not residuals_cm:
+        return None
+    arr = np.asarray(residuals_cm, dtype=float)
+    out = {
+        'count': int(arr.size),
+        'mean_cm': float(arr.mean()),
+        'median_cm': float(np.median(arr)),
+        'rmse_cm': float(np.sqrt(np.mean(arr ** 2))),
+        'p95_cm': float(np.percentile(arr, 95)),
+        'max_cm': float(arr.max()),
+    }
+    if yaw_residuals_deg:
+        yaw = np.asarray(yaw_residuals_deg, dtype=float)
+        out['yaw_mean_deg'] = float(yaw.mean())
+        out['yaw_p95_deg'] = float(np.percentile(yaw, 95))
+    return out
+
+
+def export_error_metrics(runner, output_dir):
+    import csv
+    import matplotlib.pyplot as plt
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    map_metrics = compute_map_error_metrics(runner)
+    landmark_metrics = compute_landmark_pose_residual_metrics(runner)
+    csv_path = out_dir / 'slam_error_metrics.csv'
+    with csv_path.open('w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['metric', 'value'])
+        if map_metrics is not None:
+            for key in ('num_points', 'mean_cm', 'median_cm', 'rmse_cm', 'p95_cm', 'max_cm'):
+                writer.writerow([f'map_{key}', map_metrics[key]])
+        if landmark_metrics is not None:
+            for key, value in landmark_metrics.items():
+                writer.writerow([f'landmark_{key}', value])
+    if map_metrics is not None:
+        fig, ax = plt.subplots(figsize=(7, 4.5))
+        ax.hist(map_metrics['distances_cm'], bins=40, color='#3366cc', edgecolor='white')
+        ax.set_xlabel('Nearest wall error (cm)')
+        ax.set_ylabel('Count')
+        ax.set_title('Map point-to-wall error distribution')
+        fig.tight_layout()
+        fig.savefig(out_dir / 'map_point_wall_error_hist.png', dpi=170, bbox_inches='tight')
+        plt.close(fig)
+    return {'csv': csv_path, 'map_metrics': map_metrics, 'landmark_metrics': landmark_metrics}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Replay a DataLogger pickle through SLAM offline.")
-    parser.add_argument("--log_pickle", nargs="?", type=Path, default="C:\\Users\\lukelo\\Desktop\\Spring 2026\\Robots\\NYU_ROB_GY_6213\\FinalProject\\robot_python\\data\\final_trials\\robot_data_0_0_05_05_26_05_29_29.pkl")
+    parser.add_argument("--log_pickle", nargs="?", type=Path, default="/home/ernest/Desktop/NYU_ROB_GY_6213/FinalProject/robot_python/data/final_trials/robot_data_0_0_05_05_26_05_29_29.pkl")
     parser.add_argument("--output", type=Path, default=_PYTHON_DIR / "offline_slam_plot.png")
     parser.add_argument("--no-show", action="store_true")
     parser.add_argument("--no-backend", action="store_true")
@@ -556,6 +717,7 @@ def main() -> None:
     )
     parser.add_argument("--gt-traj-step-cm", type=float, default=12.0)
     parser.add_argument("--gt-traj-wobble-cm", type=float, default=2.5)
+    parser.add_argument("--metrics-dir", type=Path, default=None, help="Optional directory for map and landmark error outputs.")
     args = parser.parse_args()
 
     gt_final = tuple(args.gt_final) if args.gt_final is not None else None
@@ -581,6 +743,10 @@ def main() -> None:
         ground_truth_final_pos=gt_final,
         ground_truth_trajectory=gt_trajectory,
     )
+
+    if args.metrics_dir is not None:
+        report = export_error_metrics(runner, args.metrics_dir)
+        print(f"Saved metrics CSV to {report['csv']}")
 
 
 if __name__ == "__main__":
